@@ -1,34 +1,38 @@
 package main
 
-// ☢️ WARNING: If you are alergic a messy cowboy code, please don't read the code below ☢️
+// ☢️ WARNING: If you are alergic to messy cowboy codes, please don't read the code below ☢️
 //
 // # Intro:
 //
 // This snippet of magic is to test rrweb as a possible replacement to FullStory. It uses badger as storage because I
-// didn't want to mingle with setting up a container and migrations for storage.
+// didn't want to deal with setting up a container and migrations for storage.
 // > FullStory is a tool to record user sessions for further analysis (can be for debugging, UX etc)
 //
 // # Things which would require more work:
 //
-// - Easy search: FullStory has an easy search tool while here it would require some work around it
-// - Events integration: FullStory makes some marks on when certain GA events happened... this is not supported by the player
+// - Easy search: FullStory has an easy search tool while here it... well, it is inexistent
+// - Events integration: FullStory recognises GA events... this is not supported at the moment
+// - Storage: I just picked badgerdb because it was easy win, but it needs to be replaced ASAP (probably with S3 for events and SQL for data)
 //
 // # Endpoints:
 //
-// - /record.js: used in the target application to send data to the server
-// - /play.js?id=SESSION_ID: used to load the player anywhere -- shouldn't exist, it should be a REST
-//   endpoint which would be called by /play, but it is due to how I was initially doing/hacking it
 // - /: list all recorded sessions
-// - /play?id=SESSION_ID: loads the player page
+// - /records/{id}: load the session details and player
+// - /api/v1/records/{id}: retrive record by ID (api used by the player JS)
+// - /record.js: used in the target application to send data to the server
 //
 // # Usage:
-// To use this, add the following snippet at your app and then head to http://localhost:3000 to see the recorded sessions
+// To use this, add the following snippet to your app and then head to http://localhost:3000 to see recorded sessions
+// ```js
 // <script type="application/javascript" src="http://localhost:3000/record.js" ></script>
+// <script type="application/javascript">
+//   window.recorder.setUser({ id: 'USER_ID', email: 'test@test.com', name: 'Bruno Luiz Silva' }).setMeta({ foo: 'bar' }).setClientId('client-id')
+// </script>
+// ```
 //
 // # To-do list after testing the hack:
 //
 // - [ ] See if this makes sense
-// - [ ] Create proper APIs to retrieve records
 // - [ ] Proper UI -- could be kept as server-side rendered
 // - [ ] Make it searchable through generic parameters (example: client_id, appplication_id, user_id etc), without full scans
 // - [ ] Reconsider storage (badger was a quick win)
@@ -38,6 +42,9 @@ import (
 	"errors"
 	"log"
 	"net/http"
+	"net/url"
+	"os"
+	"sort"
 	"text/template"
 	"time"
 
@@ -45,92 +52,105 @@ import (
 	"github.com/dgraph-io/badger/v2/options"
 	"github.com/go-chi/chi"
 	"github.com/go-chi/cors"
+	_ "github.com/joho/godotenv/autoload"
+	"github.com/mssola/user_agent"
+	"github.com/urfave/cli/v2"
 	"github.com/zippoxer/bow"
 )
 
-func app(version, app string) string {
-	return `
-window.onload = function() {
-	const characters = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
-
-	function randomSequence(length) {
-		let result = "";
-		const charactersLength = characters.length;
-		for (let i = 0; i < length; i++) {
-			result += characters.charAt(Math.floor(Math.random() * charactersLength));
-		}
-		return result;
-	};
-
-	function getSessionId() {
-		let id = window.sessionStorage.getItem('rrweb_id');
-		if (id) return id;
-
-		id = randomSequence(64)
-		window.sessionStorage.setItem('rrweb_id', id);
-		return id;
-	}
-
-	function injectScript(src) {
-		return new Promise((resolve, reject) => {
-			const script = document.createElement('script');
-			script.src = src;
-			script.addEventListener('load', resolve);
-			script.addEventListener('error', e => reject(e.error));
-			document.head.appendChild(script);
-		});
-	}
-
-	injectScript('https://cdn.jsdelivr.net/npm/rrweb@` + version + `/dist/rrweb.min.js')
-		.then(() => {` +
-		app + `
-		}).catch(console.err)
-};`
-}
-
 const rrwebRecord = `
-			let events = [];
+window.recorder = {
+	events: [],
+	rrweb: undefined,
+	runner: undefined,
+	session: {
+		genId(length) {
+			const characters = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+			let result = "";
+			const charactersLength = characters.length;
+			for (let i = 0; i < length; i++) {
+				result += characters.charAt(Math.floor(Math.random() * charactersLength));
+			}
+			return result;
+		},
+		get() {
+			let session = window.sessionStorage.getItem('rrweb');
+			if (session) return JSON.parse(session);
 
-			rrweb.record({
-				emit(event) {
-					events.push(event);
-				},
+			session = {
+				id: window.recorder.session.genId(64),
+				user: { id: window.recorder.session.genId(64) },
+				clientId: 'default'
+			};
+			window.sessionStorage.setItem('rrweb', JSON.stringify(session));
+			return session;
+		},
+		save(data) {
+			const session = window.recorder.session.get();
+			window.sessionStorage.setItem('rrweb', JSON.stringify(Object.assign({}, session, data)));
+		},
+		clear() {
+			window.sessionStorage.removeItem('rrweb')
+		}
+	},
+	setUser: function({ id, email, name }) {
+		const session = window.recorder.session.get();
+		session.user = { id, email, name };
+		window.recorder.session.save(session)
+
+		return window.recorder;
+	},
+	setMeta: function(meta = {}) {
+		const session = window.recorder.session.get();
+		session.meta = meta;
+		window.recorder.session.save(session)
+
+		return window.recorder;
+	},
+	setClientId(id) {
+		const session = window.recorder.session.get();
+		session.clientId = id;
+		window.recorder.session.save(session)
+
+		return window.recorder;
+	},
+	stop() {
+		clearInterval(window.recorder.runner);
+	},
+	start() {
+		window.recorder.runner = setInterval(function save() {
+			const session = window.recorder.session.get();
+
+			fetch('{{ .URL }}/record', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify(Object.assign({}, { events: window.recorder.events }, session)),
 			});
+			window.recorder.events = []; // cleans-up events for next cycle
+		}, 5 * 1000);
+	},
+	close() {
+		clearInterval();
+		window.recorder.session.clear();
+	}
+};
 
-			setInterval(function save() {
-				const body = JSON.stringify({
-					id: getSessionId(),
-					events,
-				});
-				events = [];
-				fetch('{{ .URL }}/record', {
-					method: 'POST',
-					headers: {
-						'Content-Type': 'application/json',
-					},
-					body,
-				});
-			}, 5 * 1000);
-`
-
-const rrwebPlayer = `
-	injectScript('https://cdn.jsdelivr.net/npm/rrweb-player@latest/dist/index.js')
-		.then(() => {
-			const link = document.createElement("link");
-			link.href = "https://cdn.jsdelivr.net/npm/rrweb-player@latest/dist/style.css";
-			link.type = "text/css";
-			link.rel = "stylesheet";
-			document.getElementsByTagName("head")[0].appendChild(link);
-
-			const events = {{ .Events }};
-
-			new rrwebPlayer({
-				target: document.body, // customizable root element
-				props: {
-					events,
-				},
-			})
-		})`
+new Promise((resolve, reject) => {
+	const script = document.createElement('script');
+	script.src = 'https://cdn.jsdelivr.net/npm/rrweb@0.9.14/dist/rrweb.min.js';
+	script.addEventListener('load', resolve);
+	script.addEventListener('error', e => reject(e.error));
+	document.head.appendChild(script);
+}).then(() => {
+	window.recorder.rrweb = rrweb;
+	// TODO: This should be optimised 🤠
+	rrweb.record({
+		emit(event) {
+			window.recorder.events.push(event);
+		}
+	});
+	window.recorder.start();
+}).catch(console.err);`
 
 const playerHTML = `
 <html>
@@ -138,12 +158,51 @@ const playerHTML = `
 		<meta charset="utf-8"/>
 		<meta name="viewport" content="width=device-width, initial-scale=1.0, minimum-scale=1.0, maximum-scale=2.0, user-scalable=yes" />
 		<title>Play | rrweb-explorer</title>
-		<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.0.0-beta2/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-BmbxuPwQa2lc/FVzBcNJ7UAyJxM6wuqIj61tLrc4wSX0szH/Ev+nYRRuWlolflfl" crossorigin="anonymous">
+		<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.0.0-beta2/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-BmbxuPwQa2lc/FVzBcNJ7UAyJxM6wuqIj61tLrc4wSX0szH/Ev+nYRRuWlolflfl" crossorigin="anonymous" />
+		<link href="https://cdn.jsdelivr.net/npm/rrweb-player@latest/dist/style.css" rel="stylesheet" />
 	</head>
 	<body>
 		<div class="main container mt-3">
+			<div class="row">
+				<div class="col">
+					<nav aria-label="breadcrumb">
+						<ol class="breadcrumb">
+							<li class="breadcrumb-item"><a href="/">Recordings</a></li>
+							<li class="breadcrumb-item active" aria-current="page">Player</li>
+						</ol>
+					</nav>
+
+					<h2 class="mb-3">Recording Re-play</h2>
+					<div class="alert alert-warning" role="alert">
+						Be aware this is just a proof of concept: the storage is not optimised, searching is not possible and it is not ready for production
+					</div>
+				</div>
+			</div>
+			<div class="row mb-3">
+				<div class="col">
+					<span class="badge bg-success">{{ .Record.Client.OS }}</span>
+					<span class="badge bg-primary">{{ .Record.Client.Browser }} {{ .Record.Client.Version }}</span>
+				</div>
+			</div>
 		</div>
-		<script type="application/javascript" src="{{ .URL }}/play.js?id={{ .ID }}" ></script>
+		<div class="container mb-3" id="player">
+		</div>
+		<script type="application/javascript" src="https://cdn.jsdelivr.net/npm/rrweb-player@latest/dist/index.js" ></script>
+		<script type="application/javascript">
+			fetch('/api/v1/records/{{ .ID }}', {
+				method: 'GET',
+			})
+			.then(res => res.json())
+			.then((res) => {
+				new rrwebPlayer({
+					target: document.getElementById("player"), // customizable root element
+					props: {
+						width: document.getElementById("player").offsetWidth,
+						events: res.events,
+					},
+				});
+			}).catch(console.error);
+		</script>
 	</body>
 </html>
 `
@@ -158,72 +217,97 @@ const listHTML = `
 	</head>
 	<body>
 		<div class="container mt-3">
+			<nav aria-label="breadcrumb">
+				<ol class="breadcrumb">
+					<li class="breadcrumb-item active" aria-current="page">Recordings</li>
+				</ol>
+			</nav>
+
 			<h2 class="mb-3">Recordings</h2>
-			<ul class="list-group">
+			<div class="alert alert-warning" role="alert">
+				Be aware this is just a proof of concept: the storage is not optimised, searching is not possible and it is not ready for production
+			</div>
+
+			<ul class="list-group mb-5">
 			{{ range .Records }}
-				<a href="{{ $.URL }}/play?id={{ .ID }}" class="list-group-item list-group-item-action">
+				<a href="/records/{{ .ID }}" class="list-group-item list-group-item-action">
 					<div class="d-flex w-100 justify-content-between">
-						<h5 class="mb-1">Some Title</h5>
+						<h5 class="mb-2 mt-1"><span class="badge bg-secondary">{{ .User.ID }}</span> {{ .User.Name }} </h5>
 						<small class="text-muted">{{ .UpdatedAt.Format "Jan 02, 2006 15:04 UTC"  }}</small>
 					</div>
 					<p class="mb-1">
-					<!-- add meta -->
+					{{ range $k, $v := .Meta }}
+						<span class="badge bg-primary">{{ $k }} = {{ $v }}</span>
+					{{ end }}
 					</p>
-					<small class="text-muted"><!-- add tags --></small>
 				</a>
 			{{ end }}
 			</ul>
+
+			<h2 class="mb-3">Start using</h2>
+			<p>Insert the following snippet at the bottom of your <code>&lt;body&gt;</code> tag:</p>
+			<pre>
+&lt;script type=&quot;application/javascript&quot; src=&quot;{{ .URL }}/record.js&quot; &gt;&lt;/script&gt;
+&lt;script type=&quot;application/javascript&quot;&gt;
+window.recorder
+  .setUser({id: 'USER_ID', email: 'test@test.com', name: 'Bruno Luiz Silva' })
+  .setMeta({ foo: 'bar' })
+  .setClientId('client-id')
+&lt;/script&gt;
+			</pre>
 		</div>
 	</body>
 </html>
 `
 
+// Client keeps the session client information, mostly parsed from .UserAgent
+type Client struct {
+	UserAgent string `json:"userAgent"`
+	OS        string `json:"os"`
+	Browser   string `json:"browser"`
+	Version   string `json:"version"`
+}
+
+// Record session record model, mostly with data from the events, user and browser used
 type Record struct {
-	ID        string              `json:"id" bow:"key"`
-	Events    []interface{}       `json:"events"`
-	Meta      []map[string]string `json:"meta"`
-	Tags      []string            `json:"tags"`
-	UpdatedAt time.Time
+	ID string `json:"id" bow:"key"`
+	// TODO: these events probably should live outside the database... probably something like S3
+	Events []interface{}     `json:"events"`
+	Meta   map[string]string `json:"meta"`
+	User   struct {
+		ID    string `json:"id"`
+		Email string `json:"email"`
+		Name  string `json:"name"`
+	}
+	Client    Client    `json:"client"`
+	ClientID  string    `json:"clientId"`
+	UpdatedAt time.Time `json:"updatedAt"`
 }
 
-type RecordRequest struct {
-	ID     string              `json:"id"`
-	Events []interface{}       `json:"events"`
-	Meta   []map[string]string `json:"meta"`
-	Tags   []string            `json:"tags"`
-}
-
-const rrWebVersion = "0.9.14"
-const url = "http://localhost:3000"
-
-func main() {
-	tmplPlayer, err := template.New("player").Parse(app(rrWebVersion, rrwebPlayer))
+func run(c *cli.Context) error {
+	dbDSN, err := url.Parse(c.String("db-dsn"))
 	if err != nil {
-		log.Fatal(err)
-		return
+		panic(err)
 	}
 
-	tmplRecorder, err := template.New("recorder").Parse(app(rrWebVersion, rrwebRecord))
+	tmplRecorder, err := template.New("recorder").Parse(rrwebRecord)
 	if err != nil {
-		log.Fatal(err)
-		return
+		return err
 	}
 
 	tmplPlayerHTML, err := template.New("player_html").Parse(playerHTML)
 	if err != nil {
-		log.Fatal(err)
-		return
+		return err
 	}
 
 	tmplListHTML, err := template.New("list_html").Parse(listHTML)
 	if err != nil {
-		log.Fatal(err)
-		return
+		return err
 	}
 
-	// Open database under directory "test".
-	db, err := bow.Open("badgerdb", bow.SetBadgerOptions(
-		badger.DefaultOptions("badgerdb").
+	// Open badgerdb (please replace me)
+	db, err := bow.Open(dbDSN.Path, bow.SetBadgerOptions(
+		badger.DefaultOptions(dbDSN.Path).
 			WithTableLoadingMode(options.FileIO).
 			WithValueLogLoadingMode(options.FileIO).
 			WithNumVersionsToKeep(1).
@@ -231,22 +315,22 @@ func main() {
 			WithNumLevelZeroTablesStall(2),
 	))
 	if err != nil {
-		log.Fatal(err)
-		return
+		return err
 	}
 	defer db.Close()
 
 	r := chi.NewRouter()
 	r.Use(cors.Handler(cors.Options{
-		AllowedOrigins: []string{"*"},
+		AllowedOrigins: c.StringSlice("allowed-domains"),
 		AllowedMethods: []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
 		AllowedHeaders: []string{"Accept", "Authorization", "Content-Type", "X-CSRF-Token"},
 	}))
 
+	// Entry point for recordings
 	r.Post("/record", func(w http.ResponseWriter, r *http.Request) {
 		var req Record
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-			http.Error(w, err.Error(), http.StatusBadRequest)
+			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
 
@@ -254,84 +338,73 @@ func main() {
 		if err := db.Bucket("records").Get(req.ID, &rec); err != nil {
 			if !errors.Is(err, bow.ErrNotFound) {
 				log.Println(err)
-				http.Error(w, err.Error(), http.StatusBadRequest)
+				http.Error(w, err.Error(), http.StatusInternalServerError)
 				return
 			}
 		}
+		ua := user_agent.New(r.UserAgent())
+
 		rec.ID = req.ID
 		rec.Events = append(rec.Events, req.Events...)
+		rec.User = req.User
 		rec.Meta = req.Meta
-		rec.Tags = req.Tags
 		rec.UpdatedAt = time.Now()
+
+		browserName, browserVersion := ua.Browser()
+		rec.Client = Client{
+			UserAgent: r.UserAgent(),
+			OS:        ua.OS(),
+			Browser:   browserName,
+			Version:   browserVersion,
+		}
 
 		if err := db.Bucket("records").Put(rec); err != nil {
 			log.Println(err)
-			http.Error(w, err.Error(), http.StatusBadRequest)
+			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
 
-		w.Write([]byte("ok"))
+		w.WriteHeader(http.StatusOK)
 	})
 
+	// Renders a basic record script
 	r.Get("/record.js", func(w http.ResponseWriter, r *http.Request) {
 		err := tmplRecorder.Execute(w, struct {
 			URL string
-		}{
-			URL: url,
-		})
+		}{URL: c.String("service-url")})
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusBadRequest)
+			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
 	})
 
-	r.Get("/play.js", func(w http.ResponseWriter, r *http.Request) {
-		id := r.URL.Query().Get("id")
+	// Renders record player
+	r.Get("/records/{id}", func(w http.ResponseWriter, r *http.Request) {
+		id := chi.URLParam(r, "id")
 
 		var rec Record
 		if err := db.Bucket("records").Get(id, &rec); err != nil {
 			log.Println(err)
-			http.Error(w, err.Error(), http.StatusBadRequest)
+			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
 
-		parsedEvents, err := json.Marshal(&rec.Events)
-		if err != nil {
-			log.Println(err)
-			http.Error(w, err.Error(), http.StatusBadRequest)
-			return
-		}
-
-		err = tmplPlayer.Execute(w, struct {
-			URL    string
-			Events string
-		}{
-			URL:    url,
-			Events: string(parsedEvents),
-		})
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusBadRequest)
-			return
-		}
-	})
-
-	r.Get("/play", func(w http.ResponseWriter, r *http.Request) {
 		err = tmplPlayerHTML.Execute(w, struct {
-			URL string
-			ID  string
-		}{
-			URL: url,
-			ID:  r.URL.Query().Get("id"),
-		})
+			ID     string
+			Record Record
+		}{ID: id, Record: rec})
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusBadRequest)
+			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
 	})
 
+	// Renders records list
 	r.Get("/", func(w http.ResponseWriter, r *http.Request) {
 		var records []Record
 
+		// Brings all results in memory 🤠
+		// This is surely not ideal because it brings all .Events to memory as well... certaily it can go kaput
 		var record Record
 		iter := db.Bucket("records").Iter()
 		defer iter.Close()
@@ -339,35 +412,56 @@ func main() {
 			records = append(records, record)
 		}
 
-		err = tmplListHTML.Execute(w, struct {
-			URL     string
-			Records []Record
-		}{
-			URL:     url,
-			Records: records,
+		// Sorting in memory 🤠
+		sort.Slice(records, func(i, j int) bool {
+			return records[i].UpdatedAt.After(records[j].UpdatedAt)
 		})
+
+		err = tmplListHTML.Execute(w, struct {
+			Records []Record
+			URL     string
+		}{Records: records, URL: c.String("service-url")})
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusBadRequest)
+			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
 	})
 
-	r.Get("/api/records/{id}", func(w http.ResponseWriter, r *http.Request) {
-		id := chi.URLParam(r, "id")
+	r.Route("/api/v1/", func(r chi.Router) {
+		r.Get("/records/{id}", func(w http.ResponseWriter, r *http.Request) {
+			id := chi.URLParam(r, "id")
 
-		var rec Record
-		if err := db.Bucket("records").Get(id, &rec); err != nil {
-			log.Println(err)
-			http.Error(w, err.Error(), http.StatusBadRequest)
-			return
-		}
+			var rec Record
+			if err := db.Bucket("records").Get(id, &rec); err != nil {
+				log.Println(err)
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				return
+			}
 
-		if err := json.NewEncoder(w).Encode(&rec.Events); err != nil {
-			log.Println(err)
-			http.Error(w, err.Error(), http.StatusBadRequest)
-			return
-		}
+			if err := json.NewEncoder(w).Encode(&rec); err != nil {
+				log.Println(err)
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				return
+			}
+		})
 	})
 
-	http.ListenAndServe(":3000", r)
+	return http.ListenAndServe(c.String("address")+":"+c.String("port"), r)
+}
+
+func main() {
+	app := &cli.App{
+		Flags: []cli.Flag{
+			&cli.StringFlag{Name: "service-url", Value: "http://localhost:3000", EnvVars: []string{"SERVICE_URL"}},
+			&cli.StringFlag{Name: "address", Value: "127.0.0.1", EnvVars: []string{"ADDRESS"}},
+			&cli.StringSliceFlag{Name: "allowed-domains", Value: cli.NewStringSlice("*"), EnvVars: []string{"DB_DSN"}},
+			&cli.StringFlag{Name: "db-dsn", Value: "badger:///tmp/badgerdb", EnvVars: []string{"DB_DSN"}},
+			&cli.StringFlag{Name: "port", Value: "3000", EnvVars: []string{"PORT"}},
+		},
+		Action: run,
+	}
+
+	if err := app.Run(os.Args); err != nil {
+		log.Fatal(err)
+	}
 }
