@@ -39,23 +39,20 @@ package main
 
 import (
 	"encoding/json"
-	"errors"
 	"log"
+	"math/rand"
 	"net/http"
 	"net/url"
 	"os"
-	"sort"
 	"text/template"
 	"time"
 
-	"github.com/dgraph-io/badger/v2"
-	"github.com/dgraph-io/badger/v2/options"
 	"github.com/go-chi/chi"
 	"github.com/go-chi/cors"
 	_ "github.com/joho/godotenv/autoload"
 	"github.com/mssola/user_agent"
+	"github.com/oklog/ulid"
 	"github.com/urfave/cli/v2"
-	"github.com/zippoxer/bow"
 )
 
 const rrwebRecord = `
@@ -64,6 +61,7 @@ window.recorder = {
 	rrweb: undefined,
 	runner: undefined,
 	session: {
+		synced: false,
 		genId(length) {
 			const characters = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
 			let result = "";
@@ -74,23 +72,33 @@ window.recorder = {
 			return result;
 		},
 		get() {
-			let session = window.sessionStorage.getItem('rrweb');
-			if (session) return JSON.parse(session);
-
-			session = {
-				id: window.recorder.session.genId(64),
+			const session = window.sessionStorage.getItem('rrweb');
+			return session ? JSON.parse(session) : {
 				user: { id: window.recorder.session.genId(64) },
 				clientId: 'default'
 			};
-			window.sessionStorage.setItem('rrweb', JSON.stringify(session));
-			return session;
 		},
 		save(data) {
 			const session = window.recorder.session.get();
 			window.sessionStorage.setItem('rrweb', JSON.stringify(Object.assign({}, session, data)));
+			window.recorder.session.synced = false;
+
+			return window.recorder.session
 		},
 		clear() {
 			window.sessionStorage.removeItem('rrweb')
+		},
+		sync() {
+			if (window.recorder.session.synced) return;
+
+			return fetch('{{ .URL }}/api/v1/records', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify(window.recorder.session.get()),
+			}).then(res => {
+				window.recorder.session.synced = true;
+				return res.json();
+			})
 		}
 	},
 	setUser: function({ id, email, name }) {
@@ -117,16 +125,21 @@ window.recorder = {
 	stop() {
 		clearInterval(window.recorder.runner);
 	},
+	sync() {
+		if (!window.recorder.events.length) return;
+
+		const session = window.recorder.session.get();
+		fetch('{{ .URL }}/api/v1/records/' + session.id + '/events', {
+			method: 'PUT',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify(window.recorder.events),
+		});
+		window.recorder.events = []; // cleans-up events for next cycle
+	},
 	start() {
 		window.recorder.runner = setInterval(function save() {
-			const session = window.recorder.session.get();
-
-			fetch('{{ .URL }}/record', {
-				method: 'POST',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify(Object.assign({}, { events: window.recorder.events }, session)),
-			});
-			window.recorder.events = []; // cleans-up events for next cycle
+			window.recorder.session.sync();
+			window.recorder.sync();
 		}, 5 * 1000);
 	},
 	close() {
@@ -147,10 +160,34 @@ new Promise((resolve, reject) => {
 	rrweb.record({
 		emit(event) {
 			window.recorder.events.push(event);
-		}
+		},
+		slimDOMOptions: {
+			script: false,
+			comment: false,
+			headFavicon: false,
+			headWhitespace: false,
+			headMetaDescKeywords: false,
+			headMetaSocial: false,
+			headMetaRobots: false,
+			headMetaHttpEquiv: false,
+			headMetaAuthorship: false,
+			headMetaVerification: false,
+		},
+		inlineStylesheet: false,
+		sampling: {
+			mousemove: true,
+			mouseInteraction: false,
+			scroll: 150,
+			input: 'last',
+		},
 	});
+
+	return window.recorder.session.sync();
+}).then(res => {
+	window.recorder.session.save({ id: res.id });
 	window.recorder.start();
-}).catch(console.err);`
+})
+.catch(console.err);`
 
 const playerHTML = `
 <html>
@@ -188,8 +225,9 @@ const playerHTML = `
 		<div class="container mb-3" id="player">
 		</div>
 		<script type="application/javascript" src="https://cdn.jsdelivr.net/npm/rrweb-player@latest/dist/index.js" ></script>
+		<script type="application/javascript" src="https://cdn.jsdelivr.net/npm/rrweb@0.9.14/dist/rrweb.min.js" ></script>
 		<script type="application/javascript">
-			fetch('/api/v1/records/{{ .ID }}', {
+			fetch('/api/v1/records/{{ .ID }}/events', {
 				method: 'GET',
 			})
 			.then(res => res.json())
@@ -198,7 +236,7 @@ const playerHTML = `
 					target: document.getElementById("player"), // customizable root element
 					props: {
 						width: document.getElementById("player").offsetWidth,
-						events: res.events,
+						events: res,
 					},
 				});
 			}).catch(console.error);
@@ -260,28 +298,15 @@ window.recorder
 </html>
 `
 
-// Client keeps the session client information, mostly parsed from .UserAgent
-type Client struct {
-	UserAgent string `json:"userAgent"`
-	OS        string `json:"os"`
-	Browser   string `json:"browser"`
-	Version   string `json:"version"`
-}
-
-// Record session record model, mostly with data from the events, user and browser used
-type Record struct {
-	ID string `json:"id" bow:"key"`
-	// TODO: these events probably should live outside the database... probably something like S3
-	Events []interface{}     `json:"events"`
-	Meta   map[string]string `json:"meta"`
-	User   struct {
+var RecordCreate struct {
+	ClientID string            `json:"clientId"`
+	Meta     map[string]string `json:"meta"`
+	User     struct {
 		ID    string `json:"id"`
 		Email string `json:"email"`
 		Name  string `json:"name"`
-	}
-	Client    Client    `json:"client"`
-	ClientID  string    `json:"clientId"`
-	UpdatedAt time.Time `json:"updatedAt"`
+	} `json:"user"`
+	Client Client `json:"client"`
 }
 
 func run(c *cli.Context) error {
@@ -306,18 +331,14 @@ func run(c *cli.Context) error {
 	}
 
 	// Open badgerdb (please replace me)
-	db, err := bow.Open(dbDSN.Path, bow.SetBadgerOptions(
-		badger.DefaultOptions(dbDSN.Path).
-			WithTableLoadingMode(options.FileIO).
-			WithValueLogLoadingMode(options.FileIO).
-			WithNumVersionsToKeep(1).
-			WithNumLevelZeroTables(1).
-			WithNumLevelZeroTablesStall(2),
-	))
+	db, err := NewBadgerStore(dbDSN.Path, 0)
 	if err != nil {
 		return err
 	}
 	defer db.Close()
+
+	events := eventsStore{db.BadgerDB}
+	recordings := recordingStore{db.BadgerDB}
 
 	r := chi.NewRouter()
 	r.Use(cors.Handler(cors.Options{
@@ -325,47 +346,6 @@ func run(c *cli.Context) error {
 		AllowedMethods: []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
 		AllowedHeaders: []string{"Accept", "Authorization", "Content-Type", "X-CSRF-Token"},
 	}))
-
-	// Entry point for recordings
-	r.Post("/record", func(w http.ResponseWriter, r *http.Request) {
-		var req Record
-		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
-
-		var rec Record
-		if err := db.Bucket("records").Get(req.ID, &rec); err != nil {
-			if !errors.Is(err, bow.ErrNotFound) {
-				log.Println(err)
-				http.Error(w, err.Error(), http.StatusInternalServerError)
-				return
-			}
-		}
-		ua := user_agent.New(r.UserAgent())
-
-		rec.ID = req.ID
-		rec.Events = append(rec.Events, req.Events...)
-		rec.User = req.User
-		rec.Meta = req.Meta
-		rec.UpdatedAt = time.Now()
-
-		browserName, browserVersion := ua.Browser()
-		rec.Client = Client{
-			UserAgent: r.UserAgent(),
-			OS:        ua.OS(),
-			Browser:   browserName,
-			Version:   browserVersion,
-		}
-
-		if err := db.Bucket("records").Put(rec); err != nil {
-			log.Println(err)
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
-
-		w.WriteHeader(http.StatusOK)
-	})
 
 	// Renders a basic record script
 	r.Get("/record.js", func(w http.ResponseWriter, r *http.Request) {
@@ -382,8 +362,8 @@ func run(c *cli.Context) error {
 	r.Get("/records/{id}", func(w http.ResponseWriter, r *http.Request) {
 		id := chi.URLParam(r, "id")
 
-		var rec Record
-		if err := db.Bucket("records").Get(id, &rec); err != nil {
+		rec, err := recordings.GetByID(r.Context(), id)
+		if err != nil {
 			log.Println(err)
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
@@ -401,21 +381,12 @@ func run(c *cli.Context) error {
 
 	// Renders records list
 	r.Get("/", func(w http.ResponseWriter, r *http.Request) {
-		var records []Record
+		records, err := recordings.GetAll(r.Context(), "", 10)
 
-		// Brings all results in memory 🤠
-		// This is surely not ideal because it brings all .Events to memory as well... certaily it can go kaput
-		var record Record
-		iter := db.Bucket("records").Iter()
-		defer iter.Close()
-		for iter.Next(&record) {
-			records = append(records, record)
-		}
-
-		// Sorting in memory 🤠
-		sort.Slice(records, func(i, j int) bool {
-			return records[i].UpdatedAt.After(records[j].UpdatedAt)
-		})
+		// // Sorting in memory 🤠
+		// sort.Slice(records, func(i, j int) bool {
+		//   return records[i].UpdatedAt.After(records[j].UpdatedAt)
+		// })
 
 		err = tmplListHTML.Execute(w, struct {
 			Records []Record
@@ -431,8 +402,8 @@ func run(c *cli.Context) error {
 		r.Get("/records/{id}", func(w http.ResponseWriter, r *http.Request) {
 			id := chi.URLParam(r, "id")
 
-			var rec Record
-			if err := db.Bucket("records").Get(id, &rec); err != nil {
+			rec, err := recordings.GetByID(r.Context(), id)
+			if err != nil {
 				log.Println(err)
 				http.Error(w, err.Error(), http.StatusInternalServerError)
 				return
@@ -443,6 +414,91 @@ func run(c *cli.Context) error {
 				http.Error(w, err.Error(), http.StatusInternalServerError)
 				return
 			}
+		})
+
+		r.Get("/records/{id}/events", func(w http.ResponseWriter, r *http.Request) {
+			id := chi.URLParam(r, "id")
+
+			w.Write([]byte("["))
+			events.Get(r.Context(), id, func(b []byte, last bool) error {
+				if !last {
+					b = append(b, ',', '\n')
+				}
+				_, err := w.Write(b)
+				return err
+			})
+			w.Write([]byte("]"))
+		})
+
+		// Entry point for recordings
+		r.Post("/records", func(w http.ResponseWriter, r *http.Request) {
+			var req Record
+			if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				return
+			}
+
+			id := req.ID
+			if id == "" {
+				t := time.Now()
+				id = ulid.MustNew(ulid.Timestamp(t), ulid.Monotonic(rand.New(rand.NewSource(t.UnixNano())), 0)).String()
+			}
+
+			ua := user_agent.New(r.UserAgent())
+			browserName, browserVersion := ua.Browser()
+
+			rec := Record{
+				ID:   id,
+				User: req.User,
+				Meta: req.Meta,
+				Client: Client{
+					UserAgent: r.UserAgent(),
+					OS:        ua.OS(),
+					Browser:   browserName,
+					Version:   browserVersion,
+				},
+			}
+
+			if err := recordings.Save(r.Context(), rec); err != nil {
+				log.Println(err)
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				return
+			}
+
+			if err := json.NewEncoder(w).Encode(&rec); err != nil {
+				log.Println(err)
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				return
+			}
+		})
+
+		r.Put("/records/{id}/events", func(w http.ResponseWriter, r *http.Request) {
+			id := chi.URLParam(r, "id")
+
+			req := []interface{}{}
+			if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				return
+			}
+
+			jsons := [][]byte{}
+			for _, v := range req {
+				event, err := json.Marshal(v)
+				if err != nil {
+					log.Println(err)
+					http.Error(w, err.Error(), http.StatusInternalServerError)
+					return
+				}
+				jsons = append(jsons, event)
+			}
+
+			if err := events.Add(r.Context(), id, jsons...); err != nil {
+				log.Println(err)
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				return
+			}
+
+			w.WriteHeader(http.StatusOK)
 		})
 	})
 
