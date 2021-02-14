@@ -1,4 +1,4 @@
-package main
+package storage
 
 import (
 	"time"
@@ -43,12 +43,6 @@ func NewBadgerStore(path string, maxCacheSize int64) (*BadgerStore, error) {
 type BadgerStore struct {
 	BadgerDB *badger.DB
 	stopGC   chan struct{}
-}
-
-func (store *BadgerStore) Recordings() (*recordingStore, error) {
-	return &recordingStore{
-		db: store.BadgerDB,
-	}, nil
 }
 
 func (store *BadgerStore) startGC() {

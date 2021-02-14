@@ -1,4 +1,4 @@
-package main
+package storage
 
 import (
 	"context"
@@ -12,11 +12,15 @@ const (
 	eventsStoreNamespace = "events"
 )
 
-type eventsStore struct {
+type EventStore struct {
 	db *badger.DB
 }
 
-func (store *eventsStore) Add(ctx context.Context, id string, msgs ...[]byte) error {
+func NewEventStoreBadger(db *badger.DB) *EventStore {
+	return &EventStore{db}
+}
+
+func (store *EventStore) Add(ctx context.Context, id string, msgs ...[]byte) error {
 	return store.db.Update(func(tx *badger.Txn) error {
 		seq, err := store.lastSequence(tx, id)
 		if err != nil {
@@ -34,7 +38,7 @@ func (store *eventsStore) Add(ctx context.Context, id string, msgs ...[]byte) er
 	})
 }
 
-func (store *eventsStore) Get(ctx context.Context, id string, cb func(b []byte, last bool) error) error {
+func (store *EventStore) Get(ctx context.Context, id string, cb func(b []byte, last bool) error) error {
 	return store.db.View(func(tx *badger.Txn) error {
 		it := tx.NewIterator(badger.IteratorOptions{
 			PrefetchValues: true,
@@ -60,7 +64,7 @@ func (store *eventsStore) Get(ctx context.Context, id string, cb func(b []byte, 
 	})
 }
 
-func (store *eventsStore) lastSequence(tx *badger.Txn, id string) (uint64, error) {
+func (store *EventStore) lastSequence(tx *badger.Txn, id string) (uint64, error) {
 	it := tx.NewIterator(badger.IteratorOptions{
 		PrefetchValues: false,
 		Reverse:        true,
@@ -79,11 +83,11 @@ func (store *eventsStore) lastSequence(tx *badger.Txn, id string) (uint64, error
 	return binary.BigEndian.Uint64(lastKey[len(store.id(id)):]), nil
 }
 
-func (store *eventsStore) writeMsg(tx *badger.Txn, id string, seq uint64, msg []byte) error {
+func (store *EventStore) writeMsg(tx *badger.Txn, id string, seq uint64, msg []byte) error {
 	return tx.Set(store.messageKey(id, seq), msg)
 }
 
-func (store *eventsStore) messageKey(id string, seq uint64) []byte {
+func (store *EventStore) messageKey(id string, seq uint64) []byte {
 	key := make([]byte, len(store.id(id))+8)
 	copy(key, store.id(id))
 	binary.BigEndian.PutUint64(key[len(store.id(id)):], seq)
@@ -91,6 +95,6 @@ func (store *eventsStore) messageKey(id string, seq uint64) []byte {
 	return key
 }
 
-func (store *eventsStore) id(id string) string {
+func (store *EventStore) id(id string) string {
 	return eventsStoreNamespace + "/" + id + "/"
 }

@@ -1,4 +1,4 @@
-package main
+package storage
 
 import (
 	"context"
@@ -12,33 +12,11 @@ const (
 	recordingStoreNamespace = "recording"
 )
 
-type recordingStore struct {
+type recordingStoreBadger struct {
 	db *badger.DB
 }
 
-// Client keeps the recording client information, mostly parsed from .UserAgent
-type Client struct {
-	UserAgent string `json:"userAgent"`
-	OS        string `json:"os"`
-	Browser   string `json:"browser"`
-	Version   string `json:"version"`
-}
-
-// Record recording record model, mostly with data from the events, user and browser used
-type Record struct {
-	ID   string            `json:"id"`
-	Meta map[string]string `json:"meta"`
-	User struct {
-		ID    string `json:"id"`
-		Email string `json:"email"`
-		Name  string `json:"name"`
-	} `json:"user"`
-	Client    Client    `json:"client"`
-	ClientID  string    `json:"clientId"`
-	UpdatedAt time.Time `json:"updatedAt"`
-}
-
-func (store *recordingStore) Save(ctx context.Context, rec Record) error {
+func (store *recordingStoreBadger) Save(ctx context.Context, rec Record) error {
 	return store.db.Update(func(tx *badger.Txn) error {
 		rec.UpdatedAt = time.Now()
 
@@ -51,7 +29,7 @@ func (store *recordingStore) Save(ctx context.Context, rec Record) error {
 	})
 }
 
-func (store *recordingStore) GetByID(ctx context.Context, id string) (Record, error) {
+func (store *recordingStoreBadger) GetByID(ctx context.Context, id string) (Record, error) {
 	var rec Record
 
 	err := store.db.View(func(tx *badger.Txn) error {
@@ -68,7 +46,7 @@ func (store *recordingStore) GetByID(ctx context.Context, id string) (Record, er
 	return rec, err
 }
 
-func (store *recordingStore) GetAll(ctx context.Context, offset string, limit int) ([]Record, error) {
+func (store *recordingStoreBadger) GetAll(ctx context.Context, offset string, limit int) ([]Record, error) {
 	records := []Record{}
 
 	err := store.db.View(func(tx *badger.Txn) error {
@@ -101,6 +79,6 @@ func (store *recordingStore) GetAll(ctx context.Context, offset string, limit in
 	return records, err
 }
 
-func (store *recordingStore) key(id string) []byte {
+func (store *recordingStoreBadger) key(id string) []byte {
 	return []byte(recordingStoreNamespace + "/" + id)
 }
