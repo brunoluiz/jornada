@@ -1,26 +1,29 @@
-package storage
+package badgerdb
 
 import (
+	"net/url"
 	"time"
 
 	"github.com/dgraph-io/badger/v2"
 	"github.com/dgraph-io/badger/v2/options"
-	"github.com/pkg/errors"
 )
 
-// ErrMessageNotFound is na error returned when a message with a given offset doesn't exist.
-var ErrMessageNotFound = errors.New("message not found")
+// BadgerStore defines an instance of a badgerdb store, with
+// routines for GC and other goodies
+type BadgerStore struct {
+	BadgerDB *badger.DB
+	stopGC   chan struct{}
+}
 
-// ConsumerOffset represents consumer offset.
-type ConsumerOffset int8
-
-// NewBadgerStore returns a store instance backed by badger db.
-func NewBadgerStore(path string, maxCacheSize int64) (*BadgerStore, error) {
-	if maxCacheSize == 0 {
-		maxCacheSize = 1 << 30 // 1 GB = Badger default
+// New returns a store instance backed by badger db.
+func New(dsn string) (*BadgerStore, error) {
+	path, err := url.Parse(dsn)
+	if err != nil {
+		return nil, err
 	}
+
 	db, err := badger.Open(
-		badger.DefaultOptions(path).
+		badger.DefaultOptions(path.Path).
 			WithTableLoadingMode(options.FileIO).
 			WithValueLogLoadingMode(options.FileIO).
 			WithNumVersionsToKeep(1).
@@ -38,11 +41,6 @@ func NewBadgerStore(path string, maxCacheSize int64) (*BadgerStore, error) {
 	store.startGC()
 
 	return store, nil
-}
-
-type BadgerStore struct {
-	BadgerDB *badger.DB
-	stopGC   chan struct{}
 }
 
 func (store *BadgerStore) startGC() {
@@ -64,6 +62,7 @@ func (store *BadgerStore) startGC() {
 	}()
 }
 
+// Close close badger DB
 func (store *BadgerStore) Close() error {
 	close(store.stopGC)
 	return store.BadgerDB.Close()

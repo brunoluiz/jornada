@@ -1,4 +1,4 @@
-module github.com/brunoluiz/rrweb-explorer
+module github.com/brunoluiz/jornada
 go 1.15
 
 require (

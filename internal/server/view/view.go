@@ -1,5 +1,6 @@
 package view
 
+// JSRecorder exports a template to be used as a recording script by the user application
 const JSRecorder = `
 window.recorder = {
 	events: [],
@@ -36,7 +37,7 @@ window.recorder = {
 		sync() {
 			if (window.recorder.session.synced) return;
 
-			return fetch('{{ .URL }}/api/v1/records', {
+			return fetch('{{ .URL }}/api/v1/sessions', {
 				method: 'POST',
 				headers: { 'Content-Type': 'application/json' },
 				body: JSON.stringify(window.recorder.session.get()),
@@ -74,7 +75,7 @@ window.recorder = {
 		if (!window.recorder.events.length) return;
 
 		const session = window.recorder.session.get();
-		fetch('{{ .URL }}/api/v1/records/' + session.id + '/events', {
+		fetch('{{ .URL }}/api/v1/sessions/' + session.id + '/events', {
 			method: 'PUT',
 			headers: { 'Content-Type': 'application/json' },
 			body: JSON.stringify(window.recorder.events),
@@ -85,7 +86,7 @@ window.recorder = {
 		window.recorder.runner = setInterval(function save() {
 			window.recorder.session.sync();
 			window.recorder.sync();
-		}, 5 * 1000);
+		}, 1000);
 	},
 	close() {
 		clearInterval();
@@ -106,25 +107,24 @@ new Promise((resolve, reject) => {
 		emit(event) {
 			window.recorder.events.push(event);
 		},
-		slimDOMOptions: {
-			script: false,
-			comment: false,
-			headFavicon: false,
-			headWhitespace: false,
-			headMetaDescKeywords: false,
-			headMetaSocial: false,
-			headMetaRobots: false,
-			headMetaHttpEquiv: false,
-			headMetaAuthorship: false,
-			headMetaVerification: false,
-		},
-		inlineStylesheet: false,
-		sampling: {
-			mousemove: true,
-			mouseInteraction: false,
-			scroll: 150,
-			input: 'last',
-		},
+		// slimDOMOptions: {
+		//   script: false,
+		//   comment: false,
+		//   headFavicon: false,
+		//   headWhitespace: false,
+		//   headMetaDescKeywords: false,
+		//   headMetaSocial: false,
+		//   headMetaRobots: false,
+		//   headMetaHttpEquiv: false,
+		//   headMetaAuthorship: false,
+		//   headMetaVerification: false,
+		// },
+		// sampling: {
+		//   mousemove: true,
+		//   mouseInteraction: false,
+		//   scroll: 150,
+		//   input: 'last',
+		// },
 	});
 
 	return window.recorder.session.sync();
@@ -134,12 +134,13 @@ new Promise((resolve, reject) => {
 })
 .catch(console.err);`
 
-const HTMLRecordByID = `
+// HTMLSessionByID template for the session informations and player
+const HTMLSessionByID = `
 <html>
 	<head>
 		<meta charset="utf-8"/>
 		<meta name="viewport" content="width=device-width, initial-scale=1.0, minimum-scale=1.0, maximum-scale=2.0, user-scalable=yes" />
-		<title>Play | rrweb-explorer</title>
+		<title>Play | Jornada</title>
 		<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.0.0-beta2/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-BmbxuPwQa2lc/FVzBcNJ7UAyJxM6wuqIj61tLrc4wSX0szH/Ev+nYRRuWlolflfl" crossorigin="anonymous" />
 		<link href="https://cdn.jsdelivr.net/npm/rrweb-player@latest/dist/style.css" rel="stylesheet" />
 	</head>
@@ -149,12 +150,12 @@ const HTMLRecordByID = `
 				<div class="col">
 					<nav aria-label="breadcrumb">
 						<ol class="breadcrumb">
-							<li class="breadcrumb-item"><a href="/">Recordings</a></li>
+							<li class="breadcrumb-item"><a href="/">Sessions</a></li>
 							<li class="breadcrumb-item active" aria-current="page">Player</li>
 						</ol>
 					</nav>
 
-					<h2 class="mb-3">Recording Re-play</h2>
+					<h2 class="mb-3">Session re-play</h2>
 					<div class="alert alert-warning" role="alert">
 						Be aware this is just a proof of concept: the storage is not optimised, searching is not possible and it is not ready for production
 					</div>
@@ -162,8 +163,8 @@ const HTMLRecordByID = `
 			</div>
 			<div class="row mb-3">
 				<div class="col">
-					<span class="badge bg-success">{{ .Record.Client.OS }}</span>
-					<span class="badge bg-primary">{{ .Record.Client.Browser }} {{ .Record.Client.Version }}</span>
+					<span class="badge bg-success">{{ .Session.Client.OS }}</span>
+					<span class="badge bg-primary">{{ .Session.Client.Browser }} {{ .Session.Client.Version }}</span>
 				</div>
 			</div>
 		</div>
@@ -172,7 +173,7 @@ const HTMLRecordByID = `
 		<script type="application/javascript" src="https://cdn.jsdelivr.net/npm/rrweb-player@latest/dist/index.js" ></script>
 		<script type="application/javascript" src="https://cdn.jsdelivr.net/npm/rrweb@0.9.14/dist/rrweb.min.js" ></script>
 		<script type="application/javascript">
-			fetch('/api/v1/records/{{ .ID }}/events', {
+			fetch('/api/v1/sessions/{{ .ID }}/events', {
 				method: 'GET',
 			})
 			.then(res => res.json())
@@ -190,30 +191,31 @@ const HTMLRecordByID = `
 </html>
 `
 
-const HTMLRecordList = `
+// HTMLSessionList template for the session list and for the service root (/)
+const HTMLSessionList = `
 <html>
 	<head>
 		<meta charset="utf-8"/>
 		<meta name="viewport" content="width=device-width, initial-scale=1.0, minimum-scale=1.0, maximum-scale=2.0, user-scalable=yes" />
-		<title>Recordings | rrweb-explorer</title>
+		<title>Sessions | Jornada</title>
 		<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.0.0-beta2/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-BmbxuPwQa2lc/FVzBcNJ7UAyJxM6wuqIj61tLrc4wSX0szH/Ev+nYRRuWlolflfl" crossorigin="anonymous">
 	</head>
 	<body>
 		<div class="container mt-3">
 			<nav aria-label="breadcrumb">
 				<ol class="breadcrumb">
-					<li class="breadcrumb-item active" aria-current="page">Recordings</li>
+					<li class="breadcrumb-item active" aria-current="page">Sessions</li>
 				</ol>
 			</nav>
 
-			<h2 class="mb-3">Recordings</h2>
+			<h2 class="mb-3">Sessions</h2>
 			<div class="alert alert-warning" role="alert">
 				Be aware this is just a proof of concept: the storage is not optimised, searching is not possible and it is not ready for production
 			</div>
 
 			<ul class="list-group mb-5">
-			{{ range .Records }}
-				<a href="/records/{{ .ID }}" class="list-group-item list-group-item-action">
+			{{ range .Sessions }}
+				<a href="/sessions/{{ .ID }}" class="list-group-item list-group-item-action">
 					<div class="d-flex w-100 justify-content-between">
 						<h5 class="mb-2 mt-1"><span class="badge bg-secondary">{{ .User.ID }}</span> {{ .User.Name }} </h5>
 						<small class="text-muted">{{ .UpdatedAt.Format "Jan 02, 2006 15:04 UTC"  }}</small>

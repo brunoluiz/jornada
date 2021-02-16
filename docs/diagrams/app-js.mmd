@@ -1,0 +1,8 @@
+sequenceDiagram
+    app->>api: create session
+    api-->>app: ok w/ session_id
+
+    loop
+        app->>api: sends events
+        app->>api: sends session updates
+    end
