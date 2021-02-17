@@ -73,7 +73,7 @@ Refer to [`ARCHITECTURE.md`](./ARCHITECTURE.md) for more informations about the 
 - [ ] Automatic release set-up w/ CGO
 - [ ] Automatic payload sanitisation (rrweb doesn't sanitise passwords by default)
 - [ ] Tweak SQLite
-- [ ] Support for telemetry/metrics
+- [x] Support for metrics
 - [ ] Test this with big traffic to understand how SQLite and BadgerDB will behave
 - [ ] Create some test suite
 - [ ] Support for other SQL engines

@@ -9,6 +9,7 @@ import (
 	"github.com/go-chi/chi"
 	"github.com/go-chi/chi/middleware"
 	"github.com/go-chi/cors"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/sirupsen/logrus"
 )
 
@@ -68,6 +69,8 @@ func New(
 		AllowedHeaders: []string{"Accept", "Authorization", "Content-Type", "X-CSRF-Token"},
 	}))
 
+	s.router.Handle("/__/metrics", promhttp.Handler())
+	s.router.Mount("/__/debug", middleware.Profiler())
 	s.router.Get("/", func(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, "/sessions", http.StatusTemporaryRedirect)
 	})
