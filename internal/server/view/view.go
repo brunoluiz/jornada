@@ -8,19 +8,10 @@ window.recorder = {
 	runner: undefined,
 	session: {
 		synced: false,
-		genId(length) {
-			const characters = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
-			let result = "";
-			const charactersLength = characters.length;
-			for (let i = 0; i < length; i++) {
-				result += characters.charAt(Math.floor(Math.random() * charactersLength));
-			}
-			return result;
-		},
 		get() {
 			const session = window.sessionStorage.getItem('rrweb');
 			return session ? JSON.parse(session) : {
-				user: { id: window.recorder.session.genId(64) },
+				user: {},
 				clientId: 'default'
 			};
 		},
@@ -68,9 +59,6 @@ window.recorder = {
 
 		return window.recorder;
 	},
-	stop() {
-		clearInterval(window.recorder.runner);
-	},
 	sync() {
 		if (!window.recorder.events.length) return;
 
@@ -83,6 +71,8 @@ window.recorder = {
 		window.recorder.events = []; // cleans-up events for next cycle
 	},
 	start() {
+		if (window.recorder.runner) return;
+
 		window.recorder.runner = setInterval(function save() {
 			window.recorder.session.sync();
 			window.recorder.sync();
@@ -91,6 +81,7 @@ window.recorder = {
 	close() {
 		clearInterval();
 		window.recorder.session.clear();
+		window.recorder.rrwebStop();
 	}
 };
 
@@ -103,7 +94,7 @@ new Promise((resolve, reject) => {
 }).then(() => {
 	window.recorder.rrweb = rrweb;
 	// TODO: This should be optimised 🤠
-	rrweb.record({
+	window.recorder.rrwebStop = rrweb.record({
 		emit(event) {
 			window.recorder.events.push(event);
 		},
@@ -217,7 +208,11 @@ const HTMLSessionList = `
 			{{ range .Sessions }}
 				<a href="/sessions/{{ .ID }}" class="list-group-item list-group-item-action">
 					<div class="d-flex w-100 justify-content-between">
+						{{ if .User.ID }}
 						<h5 class="mb-2 mt-1"><span class="badge bg-secondary">{{ .User.ID }}</span> {{ .User.Name }} </h5>
+						{{ else }}
+						<h5 class="mb-2 mt-1"><span class="badge bg-secondary">Anonymous user</span></h5>
+						{{ end }}
 						<small class="text-muted">{{ .UpdatedAt.Format "Jan 02, 2006 15:04 UTC"  }}</small>
 					</div>
 					<p class="mb-1">

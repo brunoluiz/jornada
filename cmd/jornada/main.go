@@ -16,7 +16,7 @@ func main() {
 	app := &cli.App{
 		Flags: []cli.Flag{
 			&cli.StringFlag{Name: "public-url", Value: "http://localhost:3000", EnvVars: []string{"PUBLIC_URL"}, Usage: "Public URL where the service is exposed. The service might be running on :3000, but the public access can be proxied through 80"},
-			&cli.BoolFlag{Name: "anonymise", Value: true, EnvVars: []string{"ANONYMISE"}, Usage: "If enabled, it erases any personal information from requests"},
+			&cli.BoolFlag{Name: "non-anonymised-mode", EnvVars: []string{"NON_ANONYMISED_MODE"}, Usage: "If set, it will allow user details to be recorded"},
 			&cli.StringFlag{Name: "address", Value: "0.0.0.0", EnvVars: []string{"ADDRESS"}, Usage: "Service address -- change to 127.0.0.1 if developing on Mac (avoids network warnings)"},
 			&cli.StringFlag{Name: "port", Value: "3000", EnvVars: []string{"PORT"}, Usage: "Service port"},
 			&cli.StringSliceFlag{Name: "allowed-origins", Value: cli.NewStringSlice("*"), EnvVars: []string{"ALLOWED_ORIGINS"}, Usage: "CORS allowed origins"},
@@ -62,7 +62,7 @@ func run(c *cli.Context) error {
 			Addr:           c.String("address") + ":" + c.String("port"),
 			PublicURL:      c.String("public-url"),
 			AllowedOrigins: c.StringSlice("allowed-origins"),
-			Anonymise:      c.Bool("anonymise"),
+			Anonymise:      c.Bool("non-anonymised-mode"),
 		},
 	)
 	if err != nil {

@@ -4,9 +4,11 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"math/rand"
 	"time"
 
 	"github.com/brunoluiz/jornada/internal/storage/sqldb"
+	"github.com/oklog/ulid"
 )
 
 // SessionSQL defines a session SQL repository
@@ -32,6 +34,17 @@ type Session struct {
 	Meta      map[string]string `json:"meta"`
 	User      User              `json:"user"`
 	UpdatedAt time.Time         `json:"updatedAt"`
+}
+
+// GetOrCreateID get or create an ID (based on ULID)
+func (s *Session) GetOrCreateID() string {
+	if s.ID != "" {
+		return s.ID
+	}
+
+	t := time.Now()
+	//nolint
+	return ulid.MustNew(ulid.Timestamp(t), ulid.Monotonic(rand.New(rand.NewSource(t.UnixNano())), 0)).String()
 }
 
 // NewSessionSQL cretes a session repository using SQL, running the migrations on init.

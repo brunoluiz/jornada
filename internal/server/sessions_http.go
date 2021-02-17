@@ -124,28 +124,23 @@ func (s *Server) registerSessionRoutes(r *chi.Mux) error {
 				return
 			}
 
-			id := req.ID
-			if id == "" {
-				t := time.Now()
-				//nolint
-				id = ulid.MustNew(ulid.Timestamp(t), ulid.Monotonic(rand.New(rand.NewSource(t.UnixNano())), 0)).String()
-			}
-
+			user := req.User
 			if s.config.Anonymise {
-				req.User.Email = ""
-				req.User.Name = ""
+				user = repo.User{}
+			} else if user.ID == "" {
+				user.ID = genULID()
 			}
 
 			ua := user_agent.New(r.UserAgent())
 			browserName, browserVersion := ua.Browser()
 
 			rec := repo.Session{
-				ID:        id,
+				ID:        req.GetOrCreateID(),
 				UserAgent: r.UserAgent(),
 				OS:        ua.OS(),
 				Browser:   browserName,
 				Version:   browserVersion,
-				User:      req.User,
+				User:      user,
 				Meta:      req.Meta,
 			}
 
@@ -189,4 +184,10 @@ func (s *Server) registerSessionRoutes(r *chi.Mux) error {
 	})
 
 	return nil
+}
+
+func genULID() string {
+	t := time.Now()
+	//nolint
+	return ulid.MustNew(ulid.Timestamp(t), ulid.Monotonic(rand.New(rand.NewSource(t.UnixNano())), 0)).String()
 }
