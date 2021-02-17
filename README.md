@@ -12,6 +12,8 @@ If you have a live website, users will be interacting with it. But recording the
 - Debug reported issues
 - User behaviour and experience analysis
 
+![](./docs/demo.gif)
+
 > ☢️ WARNING: although this version is better than the [original prototype hack code][1], this project is still not recommended for developers 
 > with accute hacky code alergy. It might still contain some hacky solutions, and some choices might make people scream (SQLite). ☢️
 
