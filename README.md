@@ -12,10 +12,11 @@ If you have a live website, users will be interacting with it. But recording the
 - Debug reported issues
 - User behaviour and experience analysis
 
+> ☢️ WARNING: although this version is way better than the [original prototype hack code][1], this project is still under development and
+> is not recommended for developers with severe hacky code alergy. ☢️
+
 ![](./docs/demo.gif)
 
-> ☢️ WARNING: although this version is better than the [original prototype hack code][1], this project is still not recommended for developers 
-> with accute hacky code alergy. It might still contain some hacky solutions, and some choices might make people scream (SQLite). ☢️
 
 ## Installation
 
@@ -37,9 +38,9 @@ The tool is available as a Docker image as well. Please refer to [Docker Hub pag
 
 ## Usage
 
-**ℹ️ Be aware that, by default, the data will be always anonymised. Even if the client sends user data, the server will not save any PII (personal 
-identifiable information).This includes user ids, names and e-mails. If your application grants permission to gather certain personal data, 
-run the application with --non-anonymised-mode.**
+**⚠️ Be aware that, by default, the data will be always anonymised. Even if the client sends user data, the server will not save any PII (personal 
+identifiable information). This includes user ids, names and e-mails. If your application is granted to gather certain personal data, 
+run the application with `--non-anonymised-mode` flag.**
 
 ### Server
 
@@ -77,17 +78,19 @@ Add the following snippet to your app (at the end of `<body>`) and then head to 
 
 ## Development
 
-### Running locally
+### Architecture & Documentation
+
+- Refer to [`docs/js_client.md`](./docs/js_client.md) for more informations about the JS client.
+- Refer to [`docs/architecture.md`](./docs/architecture.md) for more informations about the service implementation.
+
+### Running Jornada from source
+
+If you want to contribute with Jornada, you might need to run from the source. The following steps are required:
 
 - Install `go` and `gcc` tooling
 - Get SQLite `go get github.com/mattn/go-sqlite3`
 - `go run ./cmd/jornada`
 - By default, it will be served on `http://localhost:3000`
-
-### Architecture & Documentation
-
-- Refer to [`docs/js_client.md`](./docs/js_client.md) for more informations about the JS client.
-- Refer to [`docs/architecture.md`](./docs/architecture.md) for more informations about the service implementation.
 
 ## To-do
 
@@ -102,6 +105,7 @@ Add the following snippet to your app (at the end of `<body>`) and then head to 
 - [x] Support for metrics
 - [ ] Test this with big traffic to understand how SQLite and BadgerDB will behave
 - [ ] Create some test suite
+- [ ] Support database automatic clean-ups, based on configurations
 - [ ] Support for other SQL engines
 - [ ] Support filter and search (based on meta or client data)
 - [ ] Support for player streaming/live mode (less memory consumption)
