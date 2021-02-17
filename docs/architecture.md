@@ -9,11 +9,11 @@ The following happens once the recorder is instantiated:
 
 - Call `POST /api/v1/sessions` to create a session (receives `session id`)
 - Call `POST /api/v1/sessions` for sub-sequent sessions updates, but attaching the `session id` on the body
-- Every 5 seconds, dump recorded events to the service through `POST /api/v1/sessions/{id}/events`
+- Every T seconds, dump recorded events to the service through `POST /api/v1/sessions/{id}/events`
 
 [![](https://mermaid.ink/img/eyJjb2RlIjoic2VxdWVuY2VEaWFncmFtXG4gICAgYXBwLT4-YXBpOiBjcmVhdGUgc2Vzc2lvblxuICAgIGFwaS0tPj5hcHA6IG9rIHcvIHNlc3Npb25faWRcblxuICAgIGxvb3BcbiAgICAgICAgYXBwLT4-YXBpOiBzZW5kcyBldmVudHNcbiAgICAgICAgYXBwLT4-YXBpOiBzZW5kcyBzZXNzaW9uIHVwZGF0ZXNcbiAgICBlbmRcbiIsIm1lcm1haWQiOnsidGhlbWUiOiJuZXV0cmFsIn0sInVwZGF0ZUVkaXRvciI6ZmFsc2V9)](https://mermaid-js.github.io/mermaid-live-editor/#/edit/eyJjb2RlIjoic2VxdWVuY2VEaWFncmFtXG4gICAgYXBwLT4-YXBpOiBjcmVhdGUgc2Vzc2lvblxuICAgIGFwaS0tPj5hcHA6IG9rIHcvIHNlc3Npb25faWRcblxuICAgIGxvb3BcbiAgICAgICAgYXBwLT4-YXBpOiBzZW5kcyBldmVudHNcbiAgICAgICAgYXBwLT4-YXBpOiBzZW5kcyBzZXNzaW9uIHVwZGF0ZXNcbiAgICBlbmRcbiIsIm1lcm1haWQiOnsidGhlbWUiOiJuZXV0cmFsIn0sInVwZGF0ZUVkaXRvciI6ZmFsc2V9)
 
-The available JS API can be seen in [./internal/http/view/view.go](here). In the future, this will be extracted as a npm package.
+The available JS API can be seen in [./internal/server/view/view.go](here). In the future, this will be extracted as a npm package.
 
 ## Storage
 

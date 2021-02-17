@@ -37,13 +37,17 @@ The tool is available as a Docker image as well. Please refer to [Docker Hub pag
 
 ## Usage
 
+**ℹ️ Be aware that, by default, the data will be always anonymised. Even if the client sends user data, the server will not save any PII (personal 
+identifiable information).This includes user ids, names and e-mails. If your application grants permission to gather certain personal data, 
+run the application with --non-anonymised-mode.**
+
 ### Server
 
 Use one of the distributions above to fetch a binary. Before running, bear in mind the following configurations:
 
 ```
    --public-url value       Public URL where the service is exposed. The service might be running on :3000, but the public access can be proxied through 80 (default: "http://localhost:3000") [$PUBLIC_URL]
-   --anonymise              If enabled, it erases any personal information from requests (default: true) [$ANONYMISE]
+   --non-anonymised-mode    If set, it will allow user details to be recorded (default: false) [$NON_ANONYMISED_MODE]
    --address value          Service address -- change to 127.0.0.1 if developing on Mac (avoids network warnings) (default: "0.0.0.0") [$ADDRESS]
    --port value             Service port (default: "3000") [$PORT]
    --allowed-origins value  CORS allowed origins (default: "*") [$ALLOWED_ORIGINS]
@@ -54,7 +58,7 @@ Use one of the distributions above to fetch a binary. Before running, bear in mi
 
 ### Client
 
-To use this, add the following snippet to your app (at the end of `<body>`) and then head to http://localhost:3000 to see recorded sessions
+Add the following snippet to your app (at the end of `<body>`) and then head to `http://localhost:3000` to see recorded sessions
 
 ```js
 <script type="application/javascript" src="http://localhost:3000/record.js" ></script>
@@ -80,9 +84,10 @@ To use this, add the following snippet to your app (at the end of `<body>`) and 
 - `go run ./cmd/jornada`
 - By default, it will be served on `http://localhost:3000`
 
-### Architecture
+### Architecture & Documentation
 
-Refer to [`ARCHITECTURE.md`](./ARCHITECTURE.md) for more informations about the service implementation.
+- Refer to [`docs/js_client.md`](./docs/js_client.md) for more informations about the JS client.
+- Refer to [`docs/architecture.md`](./docs/architecture.md) for more informations about the service implementation.
 
 ## To-do
 
