@@ -1,0 +1,4 @@
+FROM debian
+COPY jornada /
+ENV PORT 3000
+ENTRYPOINT ["/jornada"]

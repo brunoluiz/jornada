@@ -19,17 +19,21 @@ If you have a live website, users will be interacting with it. But recording the
 
 ## Installation
 
-### Linux and Windows
-
-> ⚠️ Compiled binary releases not available yet
-
 ### MacOS
 
-> ⚠️ Compiled binary releases not available yet
+Use `brew` to install it
+
+```
+brew install brunoluiz/tap/mermaid-server
+```
+
+### Linux and Windows
+
+[Check the releases section](https://github.com/brunoluiz/jornada/releases) for more information details 
 
 ### Docker
 
-> ⚠️ Docker images not available yet
+The tool is available as a Docker image as well. Please refer to [Docker Hub page](https://hub.docker.com/r/brunoluiz/jornada/tags) to pick a release
 
 ## Usage in your frontend application
 
