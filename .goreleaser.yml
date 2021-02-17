@@ -72,8 +72,6 @@ dockers:
     - 'brunoluiz/jornada:v{{ .Major }}.{{ .Minor }}'
     - 'brunoluiz/jornada:latest'
     dockerfile: 'Dockerfile.prod'
-    binaries:
-    - jornada
 
 brews:
   - tap:

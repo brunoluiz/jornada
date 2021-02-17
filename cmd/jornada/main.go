@@ -15,14 +15,14 @@ import (
 func main() {
 	app := &cli.App{
 		Flags: []cli.Flag{
-			&cli.StringFlag{Name: "public-url", Value: "http://localhost:3000", EnvVars: []string{"SERVICE_URL"}},
-			&cli.StringFlag{Name: "address", Value: "0.0.0.0", EnvVars: []string{"ADDRESS"}},
-			&cli.StringSliceFlag{Name: "allowed-domains", Value: cli.NewStringSlice("*"), EnvVars: []string{"DB_DSN"}},
-			&cli.StringFlag{Name: "db-dsn", Value: "sqlite:///tmp/jornada.db?cache=shared&mode=rwc&_journal_mode=WAL", EnvVars: []string{"DB_DSN"}},
-			&cli.StringFlag{Name: "events-dsn", Value: "badger:///tmp/jornada.events", EnvVars: []string{"DB_DSN"}},
-			&cli.StringFlag{Name: "port", Value: "3000", EnvVars: []string{"PORT"}},
-			&cli.StringFlag{Name: "log-level", Value: "info", EnvVars: []string{"LOG_LEVEL"}},
-			&cli.BoolFlag{Name: "anonymise", Value: true, EnvVars: []string{"ANONYMISE"}},
+			&cli.StringFlag{Name: "public-url", Value: "http://localhost:3000", EnvVars: []string{"PUBLIC_URL"}, Usage: "Public URL where the service is exposed. The service might be running on :3000, but the public access can be proxied through 80"},
+			&cli.BoolFlag{Name: "anonymise", Value: true, EnvVars: []string{"ANONYMISE"}, Usage: "If enabled, it erases any personal information from requests"},
+			&cli.StringFlag{Name: "address", Value: "0.0.0.0", EnvVars: []string{"ADDRESS"}, Usage: "Service address -- change to 127.0.0.1 if developing on Mac (avoids network warnings)"},
+			&cli.StringFlag{Name: "port", Value: "3000", EnvVars: []string{"PORT"}, Usage: "Service port"},
+			&cli.StringSliceFlag{Name: "allowed-origins", Value: cli.NewStringSlice("*"), EnvVars: []string{"ALLOWED_ORIGINS"}, Usage: "CORS allowed origins"},
+			&cli.StringFlag{Name: "db-dsn", Value: "sqlite:///tmp/jornada.db?cache=shared&mode=rwc&_journal_mode=WAL", EnvVars: []string{"DB_DSN"}, Usage: "DSN for SQL database (see github.com/mattn/go-sqlite3 for more options)"},
+			&cli.StringFlag{Name: "events-dsn", Value: "badger:///tmp/jornada.events", EnvVars: []string{"EVENTS_DSN"}, Usage: "Events storage path (BadgerDB)"},
+			&cli.StringFlag{Name: "log-level", Value: "info", EnvVars: []string{"LOG_LEVEL"}, Usage: "Log level"},
 		},
 		Action: run,
 	}
@@ -61,7 +61,7 @@ func run(c *cli.Context) error {
 		server.Config{
 			Addr:           c.String("address") + ":" + c.String("port"),
 			PublicURL:      c.String("public-url"),
-			AllowedOrigins: c.StringSlice("allowed-domains"),
+			AllowedOrigins: c.StringSlice("allowed-origins"),
 			Anonymise:      c.Bool("anonymise"),
 		},
 	)

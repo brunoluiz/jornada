@@ -24,7 +24,7 @@ If you have a live website, users will be interacting with it. But recording the
 Use `brew` to install it
 
 ```
-brew install brunoluiz/tap/mermaid-server
+brew install brunoluiz/tap/jornada
 ```
 
 ### Linux and Windows
@@ -35,7 +35,24 @@ brew install brunoluiz/tap/mermaid-server
 
 The tool is available as a Docker image as well. Please refer to [Docker Hub page](https://hub.docker.com/r/brunoluiz/jornada/tags) to pick a release
 
-## Usage in your frontend application
+## Usage
+
+### Server
+
+Use one of the distributions above to fetch a binary. Before running, bear in mind the following configurations:
+
+```
+   --public-url value       Public URL where the service is exposed. The service might be running on :3000, but the public access can be proxied through 80 (default: "http://localhost:3000") [$PUBLIC_URL]
+   --anonymise              If enabled, it erases any personal information from requests (default: true) [$ANONYMISE]
+   --address value          Service address -- change to 127.0.0.1 if developing on Mac (avoids network warnings) (default: "0.0.0.0") [$ADDRESS]
+   --port value             Service port (default: "3000") [$PORT]
+   --allowed-origins value  CORS allowed origins (default: "*") [$ALLOWED_ORIGINS]
+   --db-dsn value           DSN for SQL database (see github.com/mattn/go-sqlite3 for more options) (default: "sqlite:///tmp/jornada.db?cache=shared&mode=rwc&_journal_mode=WAL") [$DB_DSN]
+   --events-dsn value       Events storage path (BadgerDB) (default: "badger:///tmp/jornada.events") [$EVENTS_DSN]
+   --log-level value        Log level (default: "info") [$LOG_LEVEL]
+```
+
+### Client
 
 To use this, add the following snippet to your app (at the end of `<body>`) and then head to http://localhost:3000 to see recorded sessions
 
@@ -74,7 +91,7 @@ Refer to [`ARCHITECTURE.md`](./ARCHITECTURE.md) for more informations about the 
 - [x] Create easy to use/query storage for sessions
 - [x] Create events storage
 - [x] Create GDRP safe-mode
-- [ ] Automatic release set-up w/ CGO
+- [x] Automatic release set-up w/ CGO
 - [ ] Automatic payload sanitisation (rrweb doesn't sanitise passwords by default)
 - [ ] Tweak SQLite
 - [x] Support for metrics
