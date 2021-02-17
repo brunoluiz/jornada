@@ -4,6 +4,7 @@ import (
 	"log"
 	"os"
 
+	"github.com/brunoluiz/jornada/internal/op/logger"
 	"github.com/brunoluiz/jornada/internal/repo"
 	"github.com/brunoluiz/jornada/internal/server"
 	"github.com/brunoluiz/jornada/internal/storage/badgerdb"
@@ -21,6 +22,7 @@ func main() {
 			&cli.StringFlag{Name: "db-dsn", Value: "sqlite:///tmp/jornada.db?cache=shared&mode=rwc&_journal_mode=WAL", EnvVars: []string{"DB_DSN"}},
 			&cli.StringFlag{Name: "events-dsn", Value: "badger:///tmp/jornada.events", EnvVars: []string{"DB_DSN"}},
 			&cli.StringFlag{Name: "port", Value: "3000", EnvVars: []string{"PORT"}},
+			&cli.StringFlag{Name: "log-level", Value: "info", EnvVars: []string{"LOG_LEVEL"}},
 		},
 		Action: run,
 	}
@@ -32,8 +34,9 @@ func main() {
 
 func run(c *cli.Context) error {
 	ctx := c.Context
+	log := logger.New(c.String("log-level"))
 
-	b, err := badgerdb.New(c.String("events-dsn"))
+	b, err := badgerdb.New(c.String("events-dsn"), log)
 	if err != nil {
 		return err
 	}
@@ -55,6 +58,7 @@ func run(c *cli.Context) error {
 		c.String("address")+":"+c.String("port"),
 		c.String("service-url"),
 		c.StringSlice("allowed-domains"),
+		log,
 		recordings,
 		events,
 	)

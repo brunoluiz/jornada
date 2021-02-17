@@ -2,7 +2,6 @@ package server
 
 import (
 	"encoding/json"
-	"log"
 	"math/rand"
 	"net/http"
 	"text/template"
@@ -44,7 +43,7 @@ func (s *Server) registerSessionRoutes(r *chi.Mux) error {
 	r.Get("/sessions", func(w http.ResponseWriter, r *http.Request) {
 		data, err := s.sessions.GetAll(r.Context(), "", 10)
 		if err != nil {
-			log.Println(err)
+			s.log.Error(err)
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
@@ -64,7 +63,7 @@ func (s *Server) registerSessionRoutes(r *chi.Mux) error {
 
 		rec, err := s.sessions.GetByID(r.Context(), id)
 		if err != nil {
-			log.Println(err)
+			s.log.Error(err)
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
@@ -85,13 +84,13 @@ func (s *Server) registerSessionRoutes(r *chi.Mux) error {
 
 			rec, err := s.sessions.GetByID(r.Context(), id)
 			if err != nil {
-				log.Println(err)
+				s.log.Error(err)
 				http.Error(w, err.Error(), http.StatusInternalServerError)
 				return
 			}
 
 			if err := json.NewEncoder(w).Encode(&rec); err != nil {
-				log.Println(err)
+				s.log.Error(err)
 				http.Error(w, err.Error(), http.StatusInternalServerError)
 				return
 			}
@@ -117,7 +116,7 @@ func (s *Server) registerSessionRoutes(r *chi.Mux) error {
 				return err
 			})
 			if err != nil {
-				log.Println(err)
+				s.log.Error(err)
 				http.Error(w, err.Error(), http.StatusInternalServerError)
 				return
 			}
@@ -153,13 +152,13 @@ func (s *Server) registerSessionRoutes(r *chi.Mux) error {
 			}
 
 			if err := s.sessions.Save(r.Context(), rec); err != nil {
-				log.Println(err)
+				s.log.Error(err)
 				http.Error(w, err.Error(), http.StatusInternalServerError)
 				return
 			}
 
 			if err := json.NewEncoder(w).Encode(&rec); err != nil {
-				log.Println(err)
+				s.log.Error(err)
 				http.Error(w, err.Error(), http.StatusInternalServerError)
 				return
 			}
@@ -178,7 +177,7 @@ func (s *Server) registerSessionRoutes(r *chi.Mux) error {
 			for _, v := range req {
 				event, err := json.Marshal(v)
 				if err != nil {
-					log.Println(err)
+					s.log.Error(err)
 					http.Error(w, err.Error(), http.StatusInternalServerError)
 					return
 				}
@@ -186,7 +185,7 @@ func (s *Server) registerSessionRoutes(r *chi.Mux) error {
 			}
 
 			if err := s.events.Add(r.Context(), id, jsons...); err != nil {
-				log.Println(err)
+				s.log.Error(err)
 				http.Error(w, err.Error(), http.StatusInternalServerError)
 				return
 			}

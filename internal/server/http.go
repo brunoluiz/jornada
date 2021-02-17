@@ -2,13 +2,13 @@ package server
 
 import (
 	"context"
-	"log"
 	"net/http"
 	"time"
 
 	"github.com/brunoluiz/jornada/internal/repo"
 	"github.com/go-chi/chi"
 	"github.com/go-chi/cors"
+	"github.com/sirupsen/logrus"
 )
 
 // SessionRepository defines a session repository
@@ -28,6 +28,7 @@ type EventRepository interface {
 type Server struct {
 	address    string
 	serviceURL string
+	log        *logrus.Logger
 	server     *http.Server
 	router     *chi.Mux
 	sessions   SessionRepository
@@ -39,12 +40,14 @@ func New(
 	addr string,
 	serviceURL string,
 	allowedOrigins []string,
+	log *logrus.Logger,
 	sessions SessionRepository,
 	events EventRepository,
 ) (*Server, error) {
 	s := &Server{
 		address:    addr,
 		serviceURL: serviceURL,
+		log:        log,
 		router:     chi.NewRouter(),
 		sessions:   sessions,
 		events:     events,
@@ -77,7 +80,7 @@ func New(
 
 // Open start serving requests through configurations done in *Server
 func (s *Server) Open() error {
-	log.Println("Running on " + s.address)
+	s.log.Infof("Running on %s ⚡️", s.address)
 	return s.server.ListenAndServe()
 }
 

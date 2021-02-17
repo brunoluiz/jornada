@@ -16,7 +16,7 @@ type BadgerStore struct {
 }
 
 // New returns a store instance backed by badger db.
-func New(dsn string) (*BadgerStore, error) {
+func New(dsn string, logger badger.Logger) (*BadgerStore, error) {
 	path, err := url.Parse(dsn)
 	if err != nil {
 		return nil, err
@@ -24,6 +24,8 @@ func New(dsn string) (*BadgerStore, error) {
 
 	db, err := badger.Open(
 		badger.DefaultOptions(path.Path).
+			WithLogger(logger).
+			WithLoggingLevel(badger.ERROR).
 			WithTableLoadingMode(options.FileIO).
 			WithValueLogLoadingMode(options.FileIO).
 			WithNumVersionsToKeep(1).

@@ -53,14 +53,24 @@ func NewSessionSQL(ctx context.Context, db *sql.DB) (*SessionSQL, error) {
 				browser TEXT,
 				version TEXT,
 				meta JSON,
-				updated_at DATE
+				updated_at DATETIME
 			)`,
+		},
+		{
+			SQL: "CREATE INDEX IF NOT EXISTS sessions_updated_at_idx ON sessions (updated_at)",
 		},
 		{
 			SQL: `CREATE TABLE IF NOT EXISTS users (
 				id TEXT PRIMARY KEY,
 				name TEXT,
 				email TEXT
+			)`,
+		},
+		{
+			SQL: `CREATE TABLE IF NOT EXISTS meta (
+				session_id TEXT,
+				key TEXT,
+				value TEXT
 			)`,
 		},
 	}
@@ -111,6 +121,17 @@ func (store *SessionSQL) Save(ctx context.Context, in Session) error {
 		`,
 		Params: []interface{}{in.User.ID, in.User.Name, in.User.Email},
 	}}
+
+	cmds = append(cmds, sqldb.Cmd{
+		SQL:    "DELETE FROM meta WHERE session_id = $1",
+		Params: []interface{}{in.ID},
+	})
+	for k, v := range in.Meta {
+		cmds = append(cmds, sqldb.Cmd{
+			SQL:    "INSERT INTO meta (session_id, key, value) VALUES ($1, $2, $3)",
+			Params: []interface{}{in.ID, k, v},
+		})
+	}
 
 	return sqldb.Exec(ctx, store.db, cmds...)
 }
