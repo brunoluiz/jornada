@@ -69,7 +69,8 @@ Refer to [`ARCHITECTURE.md`](./ARCHITECTURE.md) for more informations about the 
 - [x] Create basic templates for UI
 - [x] Create easy to use/query storage for sessions
 - [x] Create events storage
-- [ ] Create GDRP safe-mode
+- [x] Create GDRP safe-mode
+- [ ] Automatic release set-up w/ CGO
 - [ ] Automatic payload sanitisation (rrweb doesn't sanitise passwords by default)
 - [ ] Tweak SQLite
 - [ ] Support for telemetry/metrics

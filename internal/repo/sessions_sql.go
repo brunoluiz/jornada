@@ -14,14 +14,6 @@ type SessionSQL struct {
 	db *sql.DB
 }
 
-// Client keeps the session client information, mostly parsed from .UserAgent
-type Client struct {
-	UserAgent string `json:"userAgent"`
-	OS        string `json:"os"`
-	Browser   string `json:"browser"`
-	Version   string `json:"version"`
-}
-
 // User details about session's user
 type User struct {
 	ID    string `json:"id"`
@@ -33,9 +25,12 @@ type User struct {
 type Session struct {
 	ID        string            `json:"id"`
 	ClientID  string            `json:"clientId"`
+	UserAgent string            `json:"userAgent"`
+	OS        string            `json:"os"`
+	Browser   string            `json:"browser"`
+	Version   string            `json:"version"`
 	Meta      map[string]string `json:"meta"`
 	User      User              `json:"user"`
-	Client    Client            `json:"client"`
 	UpdatedAt time.Time         `json:"updatedAt"`
 }
 
@@ -49,15 +44,13 @@ func NewSessionSQL(ctx context.Context, db *sql.DB) (*SessionSQL, error) {
 				id TEXT PRIMARY KEY,
 				client_id TEXT,
 				user_id TEXT,
+				user_agent TEXT,
 				os TEXT,
 				browser TEXT,
 				version TEXT,
 				meta JSON,
 				updated_at DATETIME
 			)`,
-		},
-		{
-			SQL: "CREATE INDEX IF NOT EXISTS sessions_updated_at_idx ON sessions (updated_at)",
 		},
 		{
 			SQL: `CREATE TABLE IF NOT EXISTS users (
@@ -67,11 +60,15 @@ func NewSessionSQL(ctx context.Context, db *sql.DB) (*SessionSQL, error) {
 			)`,
 		},
 		{
+			// This will enable users later on to query it easily through meta
 			SQL: `CREATE TABLE IF NOT EXISTS meta (
 				session_id TEXT,
 				key TEXT,
 				value TEXT
 			)`,
+		},
+		{
+			SQL: "CREATE INDEX IF NOT EXISTS sessions_updated_at_idx ON sessions (updated_at)",
 		},
 	}
 	if err := sqldb.Exec(ctx, db, cmds...); err != nil {
@@ -93,22 +90,19 @@ func (store *SessionSQL) Save(ctx context.Context, in Session) error {
 			id,
 			client_id,
 			user_id,
+			user_agent,
 			os,
 			browser,
 			version,
 			updated_at,
 			meta
-		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
 		ON CONFLICT (id) DO UPDATE SET
-			client_id = EXCLUDED.client_id,
 			user_id = EXCLUDED.user_id,
-			os = EXCLUDED.os,
-			browser = EXCLUDED.browser,
-			version = EXCLUDED.version,
 			updated_at = EXCLUDED.updated_at,
 			meta = EXCLUDED.meta
 		`,
-		Params: []interface{}{in.ID, in.ClientID, in.User.ID, in.Client.OS, in.Client.Browser, in.Client.Version, time.Now(), meta},
+		Params: []interface{}{in.ID, in.ClientID, in.User.ID, in.UserAgent, in.OS, in.Browser, in.Version, time.Now(), meta},
 	}, {
 		SQL: `INSERT INTO users (
 			id,
@@ -141,6 +135,7 @@ func (store *SessionSQL) GetByID(ctx context.Context, id string) (Session, error
 	rows, err := store.db.QueryContext(ctx, `SELECT
 		s.id,
 		s.client_id,
+		s.user_agent,
 		s.os,
 		s.browser,
 		s.version,
@@ -161,9 +156,10 @@ func (store *SessionSQL) GetByID(ctx context.Context, id string) (Session, error
 		err = rows.Scan(
 			&in.ID,
 			&in.ClientID,
-			&in.Client.OS,
-			&in.Client.Browser,
-			&in.Client.Version,
+			&in.UserAgent,
+			&in.OS,
+			&in.Browser,
+			&in.Version,
 			&in.UpdatedAt,
 			&in.User.ID,
 			&in.User.Name,
@@ -184,6 +180,7 @@ func (store *SessionSQL) GetAll(ctx context.Context, offset string, limit int) (
 	rows, err := store.db.QueryContext(ctx, `SELECT
 		s.id,
 		s.client_id,
+		s.user_agent,
 		s.os,
 		s.browser,
 		s.version,
@@ -206,9 +203,10 @@ func (store *SessionSQL) GetAll(ctx context.Context, offset string, limit int) (
 		err = rows.Scan(
 			&in.ID,
 			&in.ClientID,
-			&in.Client.OS,
-			&in.Client.Browser,
-			&in.Client.Version,
+			&in.UserAgent,
+			&in.OS,
+			&in.Browser,
+			&in.Version,
 			&in.UpdatedAt,
 			&meta,
 			&in.User.ID,

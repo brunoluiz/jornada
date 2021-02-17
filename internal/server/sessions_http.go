@@ -33,9 +33,9 @@ func (s *Server) registerSessionRoutes(r *chi.Mux) error {
 	r.Get("/record.js", func(w http.ResponseWriter, r *http.Request) {
 		err := tmplRecorder.Execute(w, struct {
 			URL string
-		}{URL: s.serviceURL})
+		}{URL: s.config.PublicURL})
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			s.Error(w, r, err, http.StatusInternalServerError)
 			return
 		}
 	})
@@ -43,17 +43,16 @@ func (s *Server) registerSessionRoutes(r *chi.Mux) error {
 	r.Get("/sessions", func(w http.ResponseWriter, r *http.Request) {
 		data, err := s.sessions.GetAll(r.Context(), "", 10)
 		if err != nil {
-			s.log.Error(err)
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			s.Error(w, r, err, http.StatusInternalServerError)
 			return
 		}
 
 		err = tmplListHTML.Execute(w, struct {
 			Sessions []repo.Session
 			URL      string
-		}{Sessions: data, URL: s.serviceURL})
+		}{Sessions: data, URL: s.config.PublicURL})
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			s.Error(w, r, err, http.StatusInternalServerError)
 			return
 		}
 	})
@@ -63,8 +62,7 @@ func (s *Server) registerSessionRoutes(r *chi.Mux) error {
 
 		rec, err := s.sessions.GetByID(r.Context(), id)
 		if err != nil {
-			s.log.Error(err)
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			s.Error(w, r, err, http.StatusInternalServerError)
 			return
 		}
 
@@ -73,7 +71,7 @@ func (s *Server) registerSessionRoutes(r *chi.Mux) error {
 			Session repo.Session
 		}{ID: id, Session: rec})
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			s.Error(w, r, err, http.StatusInternalServerError)
 			return
 		}
 	})
@@ -84,14 +82,12 @@ func (s *Server) registerSessionRoutes(r *chi.Mux) error {
 
 			rec, err := s.sessions.GetByID(r.Context(), id)
 			if err != nil {
-				s.log.Error(err)
-				http.Error(w, err.Error(), http.StatusInternalServerError)
+				s.Error(w, r, err, http.StatusInternalServerError)
 				return
 			}
 
 			if err := json.NewEncoder(w).Encode(&rec); err != nil {
-				s.log.Error(err)
-				http.Error(w, err.Error(), http.StatusInternalServerError)
+				s.Error(w, r, err, http.StatusInternalServerError)
 				return
 			}
 		})
@@ -116,8 +112,7 @@ func (s *Server) registerSessionRoutes(r *chi.Mux) error {
 				return err
 			})
 			if err != nil {
-				s.log.Error(err)
-				http.Error(w, err.Error(), http.StatusInternalServerError)
+				s.Error(w, r, err, http.StatusInternalServerError)
 				return
 			}
 		})
@@ -125,7 +120,7 @@ func (s *Server) registerSessionRoutes(r *chi.Mux) error {
 		r.Post("/", func(w http.ResponseWriter, r *http.Request) {
 			var req repo.Session
 			if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-				http.Error(w, err.Error(), http.StatusInternalServerError)
+				s.Error(w, r, err, http.StatusInternalServerError)
 				return
 			}
 
@@ -136,30 +131,31 @@ func (s *Server) registerSessionRoutes(r *chi.Mux) error {
 				id = ulid.MustNew(ulid.Timestamp(t), ulid.Monotonic(rand.New(rand.NewSource(t.UnixNano())), 0)).String()
 			}
 
+			if s.config.Anonymise {
+				req.User.Email = ""
+				req.User.Name = ""
+			}
+
 			ua := user_agent.New(r.UserAgent())
 			browserName, browserVersion := ua.Browser()
 
 			rec := repo.Session{
-				ID:   id,
-				User: req.User,
-				Meta: req.Meta,
-				Client: repo.Client{
-					UserAgent: r.UserAgent(),
-					OS:        ua.OS(),
-					Browser:   browserName,
-					Version:   browserVersion,
-				},
+				ID:        id,
+				UserAgent: r.UserAgent(),
+				OS:        ua.OS(),
+				Browser:   browserName,
+				Version:   browserVersion,
+				User:      req.User,
+				Meta:      req.Meta,
 			}
 
 			if err := s.sessions.Save(r.Context(), rec); err != nil {
-				s.log.Error(err)
-				http.Error(w, err.Error(), http.StatusInternalServerError)
+				s.Error(w, r, err, http.StatusInternalServerError)
 				return
 			}
 
 			if err := json.NewEncoder(w).Encode(&rec); err != nil {
-				s.log.Error(err)
-				http.Error(w, err.Error(), http.StatusInternalServerError)
+				s.Error(w, r, err, http.StatusInternalServerError)
 				return
 			}
 		})
@@ -169,7 +165,7 @@ func (s *Server) registerSessionRoutes(r *chi.Mux) error {
 
 			req := []interface{}{}
 			if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-				http.Error(w, err.Error(), http.StatusInternalServerError)
+				s.Error(w, r, err, http.StatusInternalServerError)
 				return
 			}
 
@@ -177,16 +173,14 @@ func (s *Server) registerSessionRoutes(r *chi.Mux) error {
 			for _, v := range req {
 				event, err := json.Marshal(v)
 				if err != nil {
-					s.log.Error(err)
-					http.Error(w, err.Error(), http.StatusInternalServerError)
+					s.Error(w, r, err, http.StatusInternalServerError)
 					return
 				}
 				jsons = append(jsons, event)
 			}
 
 			if err := s.events.Add(r.Context(), id, jsons...); err != nil {
-				s.log.Error(err)
-				http.Error(w, err.Error(), http.StatusInternalServerError)
+				s.Error(w, r, err, http.StatusInternalServerError)
 				return
 			}
 

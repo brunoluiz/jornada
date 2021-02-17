@@ -7,6 +7,7 @@ import (
 
 	"github.com/brunoluiz/jornada/internal/repo"
 	"github.com/go-chi/chi"
+	"github.com/go-chi/chi/middleware"
 	"github.com/go-chi/cors"
 	"github.com/sirupsen/logrus"
 )
@@ -26,35 +27,43 @@ type EventRepository interface {
 
 // Server defines an HTTP Server
 type Server struct {
-	address    string
-	serviceURL string
-	log        *logrus.Logger
-	server     *http.Server
-	router     *chi.Mux
-	sessions   SessionRepository
-	events     EventRepository
+	config   Config
+	log      *logrus.Logger
+	server   *http.Server
+	router   *chi.Mux
+	sessions SessionRepository
+	events   EventRepository
+}
+
+// Config server configs
+type Config struct {
+	Addr           string
+	PublicURL      string
+	AllowedOrigins []string
+	Anonymise      bool
 }
 
 // New returns an HTTP server, initialising routes and middlewares
 func New(
-	addr string,
-	serviceURL string,
-	allowedOrigins []string,
 	log *logrus.Logger,
 	sessions SessionRepository,
 	events EventRepository,
+	config Config,
 ) (*Server, error) {
 	s := &Server{
-		address:    addr,
-		serviceURL: serviceURL,
-		log:        log,
-		router:     chi.NewRouter(),
-		sessions:   sessions,
-		events:     events,
+		config:   config,
+		log:      log,
+		router:   chi.NewRouter(),
+		sessions: sessions,
+		events:   events,
 	}
 
+	s.router.Use(middleware.RequestID)
+	s.router.Use(middleware.RealIP)
+	s.router.Use(middleware.Recoverer)
+	s.router.Use(middleware.Timeout(60 * time.Second))
 	s.router.Use(cors.Handler(cors.Options{
-		AllowedOrigins: allowedOrigins,
+		AllowedOrigins: config.AllowedOrigins,
 		AllowedMethods: []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
 		AllowedHeaders: []string{"Accept", "Authorization", "Content-Type", "X-CSRF-Token"},
 	}))
@@ -68,7 +77,7 @@ func New(
 	}
 
 	s.server = &http.Server{
-		Addr:         addr,
+		Addr:         config.Addr,
 		Handler:      http.HandlerFunc(s.router.ServeHTTP),
 		ReadTimeout:  5 * time.Second,
 		WriteTimeout: 5 * time.Second,
@@ -78,9 +87,9 @@ func New(
 	return s, nil
 }
 
-// Open start serving requests through configurations done in *Server
-func (s *Server) Open() error {
-	s.log.Infof("Running on %s ⚡️", s.address)
+// Run start serving requests through configurations done in *Server
+func (s *Server) Run() error {
+	s.log.Infof("Running ⚡️ %s", s.config.Addr)
 	return s.server.ListenAndServe()
 }
 
@@ -90,4 +99,10 @@ func (s *Server) Close() error {
 	defer cancel()
 
 	return s.server.Shutdown(tCtx)
+}
+
+// Error handle http errors
+func (s *Server) Error(w http.ResponseWriter, r *http.Request, err error, code int) {
+	s.log.Error(err)
+	http.Error(w, err.Error(), code)
 }

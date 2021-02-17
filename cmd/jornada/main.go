@@ -1,7 +1,6 @@
 package main
 
 import (
-	"log"
 	"os"
 
 	"github.com/brunoluiz/jornada/internal/op/logger"
@@ -16,19 +15,20 @@ import (
 func main() {
 	app := &cli.App{
 		Flags: []cli.Flag{
-			&cli.StringFlag{Name: "service-url", Value: "http://localhost:3000", EnvVars: []string{"SERVICE_URL"}},
+			&cli.StringFlag{Name: "public-url", Value: "http://localhost:3000", EnvVars: []string{"SERVICE_URL"}},
 			&cli.StringFlag{Name: "address", Value: "127.0.0.1", EnvVars: []string{"ADDRESS"}},
 			&cli.StringSliceFlag{Name: "allowed-domains", Value: cli.NewStringSlice("*"), EnvVars: []string{"DB_DSN"}},
 			&cli.StringFlag{Name: "db-dsn", Value: "sqlite:///tmp/jornada.db?cache=shared&mode=rwc&_journal_mode=WAL", EnvVars: []string{"DB_DSN"}},
 			&cli.StringFlag{Name: "events-dsn", Value: "badger:///tmp/jornada.events", EnvVars: []string{"DB_DSN"}},
 			&cli.StringFlag{Name: "port", Value: "3000", EnvVars: []string{"PORT"}},
 			&cli.StringFlag{Name: "log-level", Value: "info", EnvVars: []string{"LOG_LEVEL"}},
+			&cli.BoolFlag{Name: "anonymise", Value: true, EnvVars: []string{"ANONYMISE"}},
 		},
 		Action: run,
 	}
 
 	if err := app.Run(os.Args); err != nil {
-		log.Fatal(err)
+		logger.New("error").Fatal(err)
 	}
 }
 
@@ -55,16 +55,19 @@ func run(c *cli.Context) error {
 	}
 
 	server, err := server.New(
-		c.String("address")+":"+c.String("port"),
-		c.String("service-url"),
-		c.StringSlice("allowed-domains"),
 		log,
 		recordings,
 		events,
+		server.Config{
+			Addr:           c.String("address") + ":" + c.String("port"),
+			PublicURL:      c.String("public-url"),
+			AllowedOrigins: c.StringSlice("allowed-domains"),
+			Anonymise:      c.Bool("anonymise"),
+		},
 	)
 	if err != nil {
 		return err
 	}
 
-	return server.Open()
+	return server.Run()
 }

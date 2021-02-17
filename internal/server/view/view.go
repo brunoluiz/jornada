@@ -163,8 +163,8 @@ const HTMLSessionByID = `
 			</div>
 			<div class="row mb-3">
 				<div class="col">
-					<span class="badge bg-success">{{ .Session.Client.OS }}</span>
-					<span class="badge bg-primary">{{ .Session.Client.Browser }} {{ .Session.Client.Version }}</span>
+					<span class="badge bg-success">{{ .Session.OS }}</span>
+					<span class="badge bg-primary">{{ .Session.Browser }} {{ .Session.Version }}</span>
 				</div>
 			</div>
 		</div>
