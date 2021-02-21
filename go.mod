@@ -4,6 +4,7 @@ go 1.15
 
 require (
 	github.com/DataDog/zstd v1.4.4 // indirect
+	github.com/alecthomas/participle v0.7.1
 	github.com/dgraph-io/badger/v2 v2.2007.2
 	github.com/dgraph-io/ristretto v0.0.4-0.20210122082011-bb5d392ed82d // indirect
 	github.com/dgryski/go-farm v0.0.0-20200201041132-a6ae2369ad13 // indirect
@@ -16,6 +17,6 @@ require (
 	github.com/oklog/ulid v1.3.1
 	github.com/prometheus/client_golang v1.9.0
 	github.com/sirupsen/logrus v1.6.0
-	github.com/stretchr/testify v1.5.1 // indirect
+	github.com/stretchr/testify v1.5.1
 	github.com/urfave/cli/v2 v2.3.0
 )
