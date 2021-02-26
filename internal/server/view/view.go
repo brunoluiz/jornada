@@ -208,7 +208,8 @@ const HTMLSessionList = `
 
 		<form action='/sessions' method='get'>
 			<div class="input-group mb-3">
-				<input type="text" class="form-control" placeholder="Query..." aria-label="Query" aria-describedby="button-addon2" name='q' value='{{ .Query }}'>
+				<input type="text" class="form-control" placeholder="Query..." aria-label="Query" aria-describedby="button-addon2" name='q' value='{{ .Query }}' id="q">
+				<button class="btn btn-outline-secondary" type="button" onclick="document.getElementById('q').value = ''">Clear</button>
 				<input type='submit' class="btn btn-primary" id="button-addon2" value='Search'/>
 			</div>
 		</form>
@@ -247,6 +248,9 @@ window.recorder
 &lt;/script&gt;
 			</pre>
 		</div>
+	<script>
+	document.getElementById("q").focus();
+	</script>
 	</body>
 </html>
 `

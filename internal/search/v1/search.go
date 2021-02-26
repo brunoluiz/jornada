@@ -9,7 +9,7 @@ import (
 
 var metaRegex = regexp.MustCompile(`(meta\.[\w]+)([\s=])+([\d]|['\w])+`)
 var quotesRegex = regexp.MustCompile(`'(.*?)'`)
-var validRegex = regexp.MustCompile(`^([\w\d\s.='"()><=!/-])+$`)
+var validRegex = regexp.MustCompile(`^([\w\d\s.='"()><=!/:-])+$`)
 var dangerousRegex = regexp.MustCompile(`((--)|([/*])).+`)
 
 // ToSQL parse an input string to a valid SQL string
@@ -31,10 +31,10 @@ func ToSQL(in string) (out string, params []interface{}, err error) {
 		m = strings.Replace(m, "'", "", -1)
 		entries := strings.Split(m, "=")
 
-		ident, value := strings.Split(entries[0], "."), entries[1]
-		key := ident[1]
+		ident, value := strings.Split(entries[0], "."), strings.Trim(entries[1], " ")
+		key := strings.Trim(ident[1], " ")
 
-		return fmt.Sprintf("(meta.key = '%s' AND meta.value = '%s')", key, value)
+		return fmt.Sprintf("json_extract(meta, '$.%s') = '%s'", key, value)
 	})
 
 	// Print all strings as SQL placeholders

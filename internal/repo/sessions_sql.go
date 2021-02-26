@@ -10,28 +10,18 @@ import (
 	sq "github.com/Masterminds/squirrel"
 	"github.com/brunoluiz/jornada/internal/storage/sqldb"
 	"github.com/oklog/ulid"
+	"github.com/sirupsen/logrus"
 )
 
 const (
-	getFields = `
-	s.id,
-	s.client_id,
-	s.user_agent,
-	s.os,
-	s.browser,
-	s.version,
-	s.updated_at,
-	s.meta,
-	u.id,
-	u.name,
-	u.email
-`
+	getFields = `s.id, s.client_id, s.user_agent, s.os, s.browser, s.version, s.updated_at, s.meta, u.id, u.name, u.email`
 )
 
 type (
 	// SessionSQL defines a session SQL repository
 	SessionSQL struct {
-		db *sql.DB
+		db  *sql.DB
+		log *logrus.Logger
 	}
 
 	// User details about session's user
@@ -71,7 +61,7 @@ func (s *Session) GetOrCreateID() string {
 // NewSessionSQL cretes a session repository using SQL, running the migrations on init.
 // If a new migration is added, ensure that something previously created doesn't exist through
 // IF NOT EXISTS operations.
-func NewSessionSQL(ctx context.Context, db *sql.DB) (*SessionSQL, error) {
+func NewSessionSQL(ctx context.Context, db *sql.DB, log *logrus.Logger) (*SessionSQL, error) {
 	cmds := []sqldb.Cmd{
 		{
 			SQL: `CREATE TABLE IF NOT EXISTS sessions (
@@ -109,7 +99,7 @@ func NewSessionSQL(ctx context.Context, db *sql.DB) (*SessionSQL, error) {
 		return nil, err
 	}
 
-	return &SessionSQL{db}, nil
+	return &SessionSQL{db, log}, nil
 }
 
 // Save save resource
@@ -182,6 +172,7 @@ func WithSearchFilter(cond string, params []interface{}) func(b *sq.SelectBuilde
 // Get get all available resources
 func (store *SessionSQL) Get(ctx context.Context, opts ...GetOpt) (out []Session, err error) {
 	q := sq.Select(getFields).
+		Distinct().
 		From("sessions s").
 		Join("users u ON s.user_id = u.id").
 		LeftJoin("meta ON meta.session_id = s.id").
@@ -191,6 +182,10 @@ func (store *SessionSQL) Get(ctx context.Context, opts ...GetOpt) (out []Session
 	}
 
 	sql, params, err := q.ToSql()
+	store.log.WithFields(logrus.Fields{
+		"sql":    sql,
+		"params": params,
+	}).Info("query run")
 	if err != nil {
 		return out, err
 	}

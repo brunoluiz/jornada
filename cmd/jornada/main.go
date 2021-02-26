@@ -49,7 +49,7 @@ func run(c *cli.Context) error {
 	defer db.Close()
 
 	events := repo.NewEventBadger(b.BadgerDB)
-	recordings, err := repo.NewSessionSQL(ctx, db)
+	recordings, err := repo.NewSessionSQL(ctx, db, log)
 	if err != nil {
 		return err
 	}
