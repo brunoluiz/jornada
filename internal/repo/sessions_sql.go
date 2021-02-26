@@ -7,34 +7,55 @@ import (
 	"math/rand"
 	"time"
 
+	sq "github.com/Masterminds/squirrel"
 	"github.com/brunoluiz/jornada/internal/storage/sqldb"
 	"github.com/oklog/ulid"
 )
 
-// SessionSQL defines a session SQL repository
-type SessionSQL struct {
-	db *sql.DB
-}
+const (
+	getFields = `
+	s.id,
+	s.client_id,
+	s.user_agent,
+	s.os,
+	s.browser,
+	s.version,
+	s.updated_at,
+	s.meta,
+	u.id,
+	u.name,
+	u.email
+`
+)
 
-// User details about session's user
-type User struct {
-	ID    string `json:"id"`
-	Email string `json:"email"`
-	Name  string `json:"name"`
-}
+type (
+	// SessionSQL defines a session SQL repository
+	SessionSQL struct {
+		db *sql.DB
+	}
 
-// Session session model, mostly with data from user and browser used
-type Session struct {
-	ID        string            `json:"id"`
-	ClientID  string            `json:"clientId"`
-	UserAgent string            `json:"userAgent"`
-	OS        string            `json:"os"`
-	Browser   string            `json:"browser"`
-	Version   string            `json:"version"`
-	Meta      map[string]string `json:"meta"`
-	User      User              `json:"user"`
-	UpdatedAt time.Time         `json:"updatedAt"`
-}
+	// User details about session's user
+	User struct {
+		ID    string `json:"id"`
+		Email string `json:"email"`
+		Name  string `json:"name"`
+	}
+
+	// Session session model, mostly with data from user and browser used
+	Session struct {
+		ID        string            `json:"id"`
+		ClientID  string            `json:"clientId"`
+		UserAgent string            `json:"userAgent"`
+		OS        string            `json:"os"`
+		Browser   string            `json:"browser"`
+		Version   string            `json:"version"`
+		Meta      map[string]string `json:"meta"`
+		User      User              `json:"user"`
+		UpdatedAt time.Time         `json:"updatedAt"`
+	}
+
+	GetOpt func(b *sq.SelectBuilder)
+)
 
 // GetOrCreateID get or create an ID (based on ULID)
 func (s *Session) GetOrCreateID() string {
@@ -144,97 +165,76 @@ func (store *SessionSQL) Save(ctx context.Context, in Session) error {
 }
 
 // GetByID get resource by id
-func (store *SessionSQL) GetByID(ctx context.Context, id string) (Session, error) {
-	rows, err := store.db.QueryContext(ctx, `SELECT
-		s.id,
-		s.client_id,
-		s.user_agent,
-		s.os,
-		s.browser,
-		s.version,
-		s.updated_at,
-		u.id,
-		u.name,
-		u.email
-	FROM sessions s
-	JOIN users u ON s.user_id = u.id
-	WHERE s.id = $1`, id)
-	if err != nil {
+func (store *SessionSQL) GetByID(ctx context.Context, id string) (out Session, err error) {
+	res, err := store.Get(ctx, WithSearchFilter("s.id = ?", []interface{}{id}))
+	if err != nil || len(res) == 0 {
 		return Session{}, err
 	}
-	defer rows.Close()
-
-	var in Session
-	for rows.Next() {
-		err = rows.Scan(
-			&in.ID,
-			&in.ClientID,
-			&in.UserAgent,
-			&in.OS,
-			&in.Browser,
-			&in.Version,
-			&in.UpdatedAt,
-			&in.User.ID,
-			&in.User.Name,
-			&in.User.Email,
-		)
-		if err != nil {
-			return Session{}, err
-		}
-	}
-
-	return in, nil
+	return res[0], nil
 }
 
-// GetAll get all available resources
-func (store *SessionSQL) GetAll(ctx context.Context, offset string, limit int) ([]Session, error) {
-	out := []Session{}
+func WithSearchFilter(cond string, params []interface{}) func(b *sq.SelectBuilder) {
+	return func(b *sq.SelectBuilder) {
+		*b = b.Where(cond, params...)
+	}
+}
 
-	rows, err := store.db.QueryContext(ctx, `SELECT
-		s.id,
-		s.client_id,
-		s.user_agent,
-		s.os,
-		s.browser,
-		s.version,
-		s.updated_at,
-		s.meta,
-		u.id,
-		u.name,
-		u.email
-	FROM sessions s
-	JOIN users u ON s.user_id = u.id
-	ORDER BY s.updated_at DESC`)
+// Get get all available resources
+func (store *SessionSQL) Get(ctx context.Context, opts ...GetOpt) (out []Session, err error) {
+	q := sq.Select(getFields).
+		From("sessions s").
+		Join("users u ON s.user_id = u.id").
+		LeftJoin("meta ON meta.session_id = s.id").
+		OrderBy("s.updated_at DESC")
+	for _, opt := range opts {
+		opt(&q)
+	}
+
+	sql, params, err := q.ToSql()
+	if err != nil {
+		return out, err
+	}
+
+	rows, err := store.db.QueryContext(ctx, sql, params...)
 	if err != nil {
 		return out, err
 	}
 	defer rows.Close()
 
 	for rows.Next() {
-		var meta []byte
-		var in Session
-		err = rows.Scan(
-			&in.ID,
-			&in.ClientID,
-			&in.UserAgent,
-			&in.OS,
-			&in.Browser,
-			&in.Version,
-			&in.UpdatedAt,
-			&meta,
-			&in.User.ID,
-			&in.User.Name,
-			&in.User.Email,
-		)
+		res, err := scanSession(rows)
 		if err != nil {
 			return out, err
 		}
 
-		if err := json.Unmarshal(meta, &in.Meta); err != nil {
-			return out, err
-		}
+		out = append(out, res)
+	}
 
-		out = append(out, in)
+	return out, nil
+}
+
+func scanSession(rs *sql.Rows) (Session, error) {
+	var meta []byte
+	var out Session
+	err := rs.Scan(
+		&out.ID,
+		&out.ClientID,
+		&out.UserAgent,
+		&out.OS,
+		&out.Browser,
+		&out.Version,
+		&out.UpdatedAt,
+		&meta,
+		&out.User.ID,
+		&out.User.Name,
+		&out.User.Email,
+	)
+	if err != nil {
+		return out, err
+	}
+
+	if err := json.Unmarshal(meta, &out.Meta); err != nil {
+		return out, err
 	}
 
 	return out, nil

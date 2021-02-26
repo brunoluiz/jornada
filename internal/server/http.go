@@ -17,7 +17,7 @@ import (
 type SessionRepository interface {
 	Save(ctx context.Context, in repo.Session) error
 	GetByID(ctx context.Context, id string) (repo.Session, error)
-	GetAll(ctx context.Context, offset string, limit int) ([]repo.Session, error)
+	Get(ctx context.Context, opts ...repo.GetOpt) ([]repo.Session, error)
 }
 
 // EventRepository defines an events repository

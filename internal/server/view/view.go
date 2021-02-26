@@ -156,6 +156,9 @@ const HTMLSessionByID = `
 				<div class="col">
 					<span class="badge bg-success">{{ .Session.OS }}</span>
 					<span class="badge bg-primary">{{ .Session.Browser }} {{ .Session.Version }}</span>
+					{{ range $k, $v := .Session.Meta }}
+						<span class="badge bg-info">meta.{{ $k }} = '{{ $v }}'</span>
+					{{ end }}
 				</div>
 			</div>
 		</div>
@@ -198,26 +201,34 @@ const HTMLSessionList = `
 					<li class="breadcrumb-item active" aria-current="page">Sessions</li>
 				</ol>
 			</nav>
-
 			<h2 class="mb-3">Sessions</h2>
 			<div class="alert alert-warning" role="alert">
 				Be aware this is just a proof of concept: the storage is not optimised, searching is not possible and it is not ready for production
 			</div>
+
+		<form action='/sessions' method='get'>
+			<div class="input-group mb-3">
+				<input type="text" class="form-control" placeholder="Query..." aria-label="Query" aria-describedby="button-addon2" name='q' value='{{ .Query }}'>
+				<input type='submit' class="btn btn-primary" id="button-addon2" value='Search'/>
+			</div>
+		</form>
 
 			<ul class="list-group mb-5">
 			{{ range .Sessions }}
 				<a href="/sessions/{{ .ID }}" class="list-group-item list-group-item-action">
 					<div class="d-flex w-100 justify-content-between">
 						{{ if .User.ID }}
-						<h5 class="mb-2 mt-1"><span class="badge bg-secondary">{{ .User.ID }}</span> {{ .User.Name }} </h5>
+						<h5 class="mb-2 mt-1"><span class="badge bg-dark">{{ .User.ID }}</span> {{ .User.Name }} </h5>
 						{{ else }}
-						<h5 class="mb-2 mt-1"><span class="badge bg-secondary">Anonymous user</span></h5>
+						<h5 class="mb-2 mt-1"><span class="badge bg-dark">Anonymous user</span></h5>
 						{{ end }}
 						<small class="text-muted">{{ .UpdatedAt.Format "Jan 02, 2006 15:04 UTC"  }}</small>
 					</div>
 					<p class="mb-1">
+					<span class="badge bg-success">{{ .OS }}</span>
+					<span class="badge bg-primary">{{ .Browser }} {{ .Version }}</span>
 					{{ range $k, $v := .Meta }}
-						<span class="badge bg-primary">{{ $k }} = {{ $v }}</span>
+						<span class="badge bg-info">meta.{{ $k }} = '{{ $v }}'</span>
 					{{ end }}
 					</p>
 				</a>

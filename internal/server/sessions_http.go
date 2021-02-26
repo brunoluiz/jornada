@@ -2,12 +2,13 @@ package server
 
 import (
 	"encoding/json"
+	"html/template"
 	"math/rand"
 	"net/http"
-	"text/template"
 	"time"
 
 	"github.com/brunoluiz/jornada/internal/repo"
+	"github.com/brunoluiz/jornada/internal/search/v1"
 	"github.com/brunoluiz/jornada/internal/server/view"
 	"github.com/go-chi/chi"
 	"github.com/mssola/user_agent"
@@ -41,7 +42,18 @@ func (s *Server) registerSessionRoutes(r *chi.Mux) error {
 	})
 
 	r.Get("/sessions", func(w http.ResponseWriter, r *http.Request) {
-		data, err := s.sessions.GetAll(r.Context(), "", 10)
+		opts := []repo.GetOpt{}
+		query := r.URL.Query().Get("q")
+		if query != "" {
+			q, params, err := search.ToSQL(query)
+			if err != nil {
+				s.Error(w, r, err, http.StatusInternalServerError)
+				return
+			}
+			opts = append(opts, repo.WithSearchFilter(q, params))
+		}
+
+		data, err := s.sessions.Get(r.Context(), opts...)
 		if err != nil {
 			s.Error(w, r, err, http.StatusInternalServerError)
 			return
@@ -50,7 +62,8 @@ func (s *Server) registerSessionRoutes(r *chi.Mux) error {
 		err = tmplListHTML.Execute(w, struct {
 			Sessions []repo.Session
 			URL      string
-		}{Sessions: data, URL: s.config.PublicURL})
+			Query    string
+		}{Sessions: data, URL: s.config.PublicURL, Query: query})
 		if err != nil {
 			s.Error(w, r, err, http.StatusInternalServerError)
 			return
