@@ -83,17 +83,11 @@ func NewSessionSQL(ctx context.Context, db *sql.DB, log *logrus.Logger) (*Sessio
 				email TEXT
 			)`,
 		},
-		{
-			// This will enable users later on to query it easily through meta
-			SQL: `CREATE TABLE IF NOT EXISTS meta (
-				session_id TEXT,
-				key TEXT,
-				value TEXT
-			)`,
-		},
-		{
-			SQL: "CREATE INDEX IF NOT EXISTS sessions_updated_at_idx ON sessions (updated_at)",
-		},
+		{SQL: "CREATE INDEX IF NOT EXISTS sessions_updated_at_idx ON sessions (updated_at)"},
+		{SQL: "CREATE INDEX IF NOT EXISTS sessions_user_id_idx ON sessions (user_id)"},
+		{SQL: "CREATE INDEX IF NOT EXISTS sessions_browser_idx ON sessions (browser)"},
+		{SQL: "CREATE INDEX IF NOT EXISTS sessions_os_idx ON sessions (os)"},
+		{SQL: "CREATE INDEX IF NOT EXISTS sessions_version_idx ON sessions (version)"},
 	}
 	if err := sqldb.Exec(ctx, db, cmds...); err != nil {
 		return nil, err
@@ -140,17 +134,6 @@ func (store *SessionSQL) Save(ctx context.Context, in Session) error {
 		Params: []interface{}{in.User.ID, in.User.Name, in.User.Email},
 	}}
 
-	cmds = append(cmds, sqldb.Cmd{
-		SQL:    "DELETE FROM meta WHERE session_id = $1",
-		Params: []interface{}{in.ID},
-	})
-	for k, v := range in.Meta {
-		cmds = append(cmds, sqldb.Cmd{
-			SQL:    "INSERT INTO meta (session_id, key, value) VALUES ($1, $2, $3)",
-			Params: []interface{}{in.ID, k, v},
-		})
-	}
-
 	return sqldb.Exec(ctx, store.db, cmds...)
 }
 
@@ -175,7 +158,6 @@ func (store *SessionSQL) Get(ctx context.Context, opts ...GetOpt) (out []Session
 		Distinct().
 		From("sessions s").
 		Join("users u ON s.user_id = u.id").
-		LeftJoin("meta ON meta.session_id = s.id").
 		OrderBy("s.updated_at DESC")
 	for _, opt := range opts {
 		opt(&q)
@@ -185,7 +167,7 @@ func (store *SessionSQL) Get(ctx context.Context, opts ...GetOpt) (out []Session
 	store.log.WithFields(logrus.Fields{
 		"sql":    sql,
 		"params": params,
-	}).Info("query run")
+	}).Debug("query")
 	if err != nil {
 		return out, err
 	}

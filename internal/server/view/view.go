@@ -147,9 +147,6 @@ const HTMLSessionByID = `
 					</nav>
 
 					<h2 class="mb-3">Session re-play</h2>
-					<div class="alert alert-warning" role="alert">
-						Be aware this is just a proof of concept: the storage is not optimised, searching is not possible and it is not ready for production
-					</div>
 				</div>
 			</div>
 			<div class="row mb-3">
@@ -202,17 +199,18 @@ const HTMLSessionList = `
 				</ol>
 			</nav>
 			<h2 class="mb-3">Sessions</h2>
-			<div class="alert alert-warning" role="alert">
-				Be aware this is just a proof of concept: the storage is not optimised, searching is not possible and it is not ready for production
-			</div>
 
-		<form action='/sessions' method='get'>
-			<div class="input-group mb-3">
-				<input type="text" class="form-control" placeholder="Query..." aria-label="Query" aria-describedby="button-addon2" name='q' value='{{ .Query }}' id="q">
-				<button class="btn btn-outline-secondary" type="button" onclick="document.getElementById('q').value = ''">Clear</button>
-				<input type='submit' class="btn btn-primary" id="button-addon2" value='Search'/>
-			</div>
-		</form>
+			<form action='/sessions' method='get'>
+				<div class="input-group mb-3">
+					<input type="text" class="form-control" placeholder="Query..." aria-label="Query" aria-describedby="button-addon2" name='q' value='{{ .Query }}' id="q">
+					<button class="btn btn-outline-secondary" type="button" onclick="document.getElementById('q').value = ''">Clear</button>
+					<input type='submit' class="btn btn-primary" id="button-addon2" value='Search'/>
+				</div>
+			</form>
+
+			{{ if .Error }}
+			<div class="alert alert-danger" role="alert">{{ .Error }}</div>
+			{{ end }}
 
 			<ul class="list-group mb-5">
 			{{ range .Sessions }}

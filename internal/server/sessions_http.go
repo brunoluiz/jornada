@@ -55,7 +55,12 @@ func (s *Server) registerSessionRoutes(r *chi.Mux) error {
 
 		data, err := s.sessions.Get(r.Context(), opts...)
 		if err != nil {
-			s.Error(w, r, err, http.StatusInternalServerError)
+			tmplListHTML.Execute(w, struct {
+				Sessions []repo.Session
+				URL      string
+				Query    string
+				Error    error
+			}{Sessions: data, URL: s.config.PublicURL, Query: query, Error: err})
 			return
 		}
 
@@ -63,6 +68,7 @@ func (s *Server) registerSessionRoutes(r *chi.Mux) error {
 			Sessions []repo.Session
 			URL      string
 			Query    string
+			Error    error
 		}{Sessions: data, URL: s.config.PublicURL, Query: query})
 		if err != nil {
 			s.Error(w, r, err, http.StatusInternalServerError)
