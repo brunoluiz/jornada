@@ -42,7 +42,7 @@ func ToSQL(in string) (out string, params []interface{}, err error) {
 		m = strings.Replace(m, "'", "", -1)
 		m = strings.Trim(m, " ")
 		params = append(params, m)
-		return fmt.Sprintf("$%d", len(params))
+		return "?"
 	})
 
 	return strings.Trim(out, " "), params, nil
