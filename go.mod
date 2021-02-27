@@ -13,10 +13,10 @@ require (
 	github.com/joho/godotenv v1.3.0
 	github.com/kr/pretty v0.2.0 // indirect
 	github.com/mattn/go-sqlite3 v1.14.6
-	github.com/mssola/user_agent v0.5.2
 	github.com/oklog/ulid v1.3.1
 	github.com/prometheus/client_golang v1.9.0
 	github.com/sirupsen/logrus v1.6.0
 	github.com/stretchr/testify v1.5.1
+	github.com/ua-parser/uap-go v0.0.0-20210121150957-347a3497cc39
 	github.com/urfave/cli/v2 v2.3.0
 )

@@ -11,8 +11,8 @@ import (
 	"github.com/brunoluiz/jornada/internal/search/v1"
 	"github.com/brunoluiz/jornada/internal/server/view"
 	"github.com/go-chi/chi"
-	"github.com/mssola/user_agent"
 	"github.com/oklog/ulid"
+	"github.com/ua-parser/uap-go/uaparser"
 )
 
 func (s *Server) registerSessionRoutes(r *chi.Mux) error {
@@ -150,17 +150,23 @@ func (s *Server) registerSessionRoutes(r *chi.Mux) error {
 				user.ID = genULID()
 			}
 
-			ua := user_agent.New(r.UserAgent())
-			browserName, browserVersion := ua.Browser()
+			parser := uaparser.NewFromSaved()
+			ua := parser.Parse(r.UserAgent())
 
 			rec := repo.Session{
 				ID:        req.GetOrCreateID(),
 				UserAgent: r.UserAgent(),
-				OS:        ua.OS(),
-				Browser:   browserName,
-				Version:   browserVersion,
-				User:      user,
-				Meta:      req.Meta,
+				Device:    ua.Device.ToString(),
+				Browser: repo.Browser{
+					Name:    ua.UserAgent.Family,
+					Version: ua.UserAgent.ToVersionString(),
+				},
+				OS: repo.OS{
+					Name:    ua.Os.Family,
+					Version: ua.Os.ToVersionString(),
+				},
+				User: user,
+				Meta: req.Meta,
 			}
 
 			if err := s.sessions.Save(r.Context(), rec); err != nil {

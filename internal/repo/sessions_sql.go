@@ -13,10 +13,6 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-const (
-	getFields = `s.id, s.client_id, s.user_agent, s.os, s.browser, s.version, s.updated_at, s.meta, u.id, u.name, u.email`
-)
-
 type (
 	// SessionSQL defines a session SQL repository
 	SessionSQL struct {
@@ -31,13 +27,24 @@ type (
 		Name  string `json:"name"`
 	}
 
+	OS struct {
+		Name    string `json:"name"`
+		Version string `json:"version"`
+	}
+
+	Browser struct {
+		Name    string `json:"name"`
+		Version string `json:"version"`
+	}
+
 	// Session session model, mostly with data from user and browser used
 	Session struct {
 		ID        string            `json:"id"`
 		ClientID  string            `json:"clientId"`
 		UserAgent string            `json:"userAgent"`
-		OS        string            `json:"os"`
-		Browser   string            `json:"browser"`
+		OS        OS                `json:"os"`
+		Browser   Browser           `json:"browser"`
+		Device    string            `json:"device"`
 		Version   string            `json:"version"`
 		Meta      map[string]string `json:"meta"`
 		User      User              `json:"user"`
@@ -69,9 +76,7 @@ func NewSessionSQL(ctx context.Context, db *sql.DB, log *logrus.Logger) (*Sessio
 				client_id TEXT,
 				user_id TEXT,
 				user_agent TEXT,
-				os TEXT,
-				browser TEXT,
-				version TEXT,
+				device TEXT,
 				meta JSON,
 				updated_at DATETIME
 			)`,
@@ -83,11 +88,27 @@ func NewSessionSQL(ctx context.Context, db *sql.DB, log *logrus.Logger) (*Sessio
 				email TEXT
 			)`,
 		},
+		{
+			SQL: `CREATE TABLE IF NOT EXISTS oses (
+				session_id TEXT PRIMARY KEY,
+				name TEXT,
+				version TEXT
+			)`,
+		},
+		{
+			SQL: `CREATE TABLE IF NOT EXISTS browsers (
+				session_id TEXT PRIMARY KEY,
+				name TEXT,
+				version TEXT
+			)`,
+		},
+		{SQL: "CREATE INDEX IF NOT EXISTS sessions_client_id_idx ON sessions (client_id)"},
 		{SQL: "CREATE INDEX IF NOT EXISTS sessions_updated_at_idx ON sessions (updated_at)"},
 		{SQL: "CREATE INDEX IF NOT EXISTS sessions_user_id_idx ON sessions (user_id)"},
-		{SQL: "CREATE INDEX IF NOT EXISTS sessions_browser_idx ON sessions (browser)"},
-		{SQL: "CREATE INDEX IF NOT EXISTS sessions_os_idx ON sessions (os)"},
-		{SQL: "CREATE INDEX IF NOT EXISTS sessions_version_idx ON sessions (version)"},
+		{SQL: "CREATE INDEX IF NOT EXISTS browser_name_idx ON browsers (name)"},
+		{SQL: "CREATE INDEX IF NOT EXISTS browser_version_idx ON browsers (version)"},
+		{SQL: "CREATE INDEX IF NOT EXISTS oses_name_idx ON oses (name)"},
+		{SQL: "CREATE INDEX IF NOT EXISTS oses_version_idx ON oses (version)"},
 	}
 	if err := sqldb.Exec(ctx, db, cmds...); err != nil {
 		return nil, err
@@ -104,35 +125,37 @@ func (store *SessionSQL) Save(ctx context.Context, in Session) error {
 	}
 
 	cmds := []sqldb.Cmd{{
-		SQL: `INSERT INTO sessions (
-			id,
-			client_id,
-			user_id,
-			user_agent,
-			os,
-			browser,
-			version,
-			updated_at,
-			meta
-		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
-		ON CONFLICT (id) DO UPDATE SET
-			user_id = EXCLUDED.user_id,
-			updated_at = EXCLUDED.updated_at,
-			meta = EXCLUDED.meta
-		`,
-		Params: []interface{}{in.ID, in.ClientID, in.User.ID, in.UserAgent, in.OS, in.Browser, in.Version, time.Now(), meta},
+		SQL: `INSERT INTO sessions (id, client_id, user_id, user_agent, device, updated_at, meta)
+			VALUES ($1, $2, $3, $4, $5, $6, $7)
+			ON CONFLICT (id) DO UPDATE SET
+				user_id = EXCLUDED.user_id,
+				updated_at = EXCLUDED.updated_at,
+				meta = EXCLUDED.meta
+			`,
+		Params: []interface{}{in.ID, in.ClientID, in.User.ID, in.UserAgent, in.Device, time.Now(), meta},
 	}, {
-		SQL: `INSERT INTO users (
-			id,
-			name,
-			email
-		) VALUES ($1, $2, $3)
-		ON CONFLICT (id) DO UPDATE SET
-			name = EXCLUDED.name,
-			email = EXCLUDED.email
-		`,
+		SQL: `INSERT INTO users (id, name, email)
+			VALUES ($1, $2, $3)
+			ON CONFLICT (id) DO UPDATE SET
+				name = EXCLUDED.name,
+				email = EXCLUDED.email`,
 		Params: []interface{}{in.User.ID, in.User.Name, in.User.Email},
-	}}
+	}, {
+		SQL: `INSERT INTO browsers (session_id, name, version) VALUES ($1, $2, $3)
+				ON CONFLICT (session_id) DO UPDATE SET
+				name = EXCLUDED.name,
+				version = EXCLUDED.version
+			`,
+		Params: []interface{}{in.ID, in.Browser.Name, in.Browser.Version},
+	}, {
+		SQL: `INSERT INTO oses (session_id, name, version) VALUES ($1, $2, $3)
+				ON CONFLICT (session_id) DO UPDATE SET
+				name = EXCLUDED.name,
+				version = EXCLUDED.version
+			`,
+		Params: []interface{}{in.ID, in.OS.Name, in.OS.Version},
+	},
+	}
 
 	return sqldb.Exec(ctx, store.db, cmds...)
 }
@@ -154,10 +177,11 @@ func WithSearchFilter(cond string, params []interface{}) func(b *sq.SelectBuilde
 
 // Get get all available resources
 func (store *SessionSQL) Get(ctx context.Context, opts ...GetOpt) (out []Session, err error) {
-	q := sq.Select(getFields).
-		Distinct().
+	q := sq.Select(`s.id, s.client_id, s.user_agent, device, os.name, os.version, browser.name, browser.version, s.updated_at, s.meta, user.id, user.name, user.email`).
 		From("sessions s").
-		Join("users u ON s.user_id = u.id").
+		Join("users user ON s.user_id = user.id").
+		Join("browsers browser ON s.id = browser.session_id").
+		Join("oses os ON s.id = os.session_id").
 		OrderBy("s.updated_at DESC")
 	for _, opt := range opts {
 		opt(&q)
@@ -192,27 +216,29 @@ func (store *SessionSQL) Get(ctx context.Context, opts ...GetOpt) (out []Session
 
 func scanSession(rs *sql.Rows) (Session, error) {
 	var meta []byte
-	var out Session
+	var session Session
 	err := rs.Scan(
-		&out.ID,
-		&out.ClientID,
-		&out.UserAgent,
-		&out.OS,
-		&out.Browser,
-		&out.Version,
-		&out.UpdatedAt,
+		&session.ID,
+		&session.ClientID,
+		&session.UserAgent,
+		&session.Device,
+		&session.OS.Name,
+		&session.OS.Version,
+		&session.Browser.Name,
+		&session.Browser.Version,
+		&session.UpdatedAt,
 		&meta,
-		&out.User.ID,
-		&out.User.Name,
-		&out.User.Email,
+		&session.User.ID,
+		&session.User.Name,
+		&session.User.Email,
 	)
 	if err != nil {
-		return out, err
+		return session, err
 	}
 
-	if err := json.Unmarshal(meta, &out.Meta); err != nil {
-		return out, err
+	if err := json.Unmarshal(meta, &session.Meta); err != nil {
+		return session, err
 	}
 
-	return out, nil
+	return session, nil
 }

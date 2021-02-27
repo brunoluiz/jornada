@@ -224,8 +224,11 @@ const HTMLSessionList = `
 						<small class="text-muted">{{ .UpdatedAt.Format "Jan 02, 2006 15:04 UTC"  }}</small>
 					</div>
 					<p class="mb-1">
-					<span class="badge bg-success">{{ .OS }}</span>
-					<span class="badge bg-primary">{{ .Browser }} {{ .Version }}</span>
+					<span class="badge bg-primary">device = '{{ .Device }}'</span>
+					<span class="badge bg-primary">os.name = '{{ .OS.Name }}'</span>
+					<span class="badge bg-primary">os.version = '{{ .OS.Version }}'</span>
+					<span class="badge bg-secondary">browser.name = '{{ .Browser.Name }}'</span>
+					<span class="badge bg-secondary">browser.version = '{{ .Browser.Version }}'</span>
 					{{ range $k, $v := .Meta }}
 						<span class="badge bg-info">meta.{{ $k }} = '{{ $v }}'</span>
 					{{ end }}
