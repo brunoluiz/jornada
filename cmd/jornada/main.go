@@ -49,7 +49,7 @@ func run(c *cli.Context) error {
 	defer db.Close()
 
 	events := repo.NewEventBadger(b.BadgerDB)
-	recordings, err := repo.NewSessionSQL(ctx, db)
+	recordings, err := repo.NewSessionSQL(ctx, db, log)
 	if err != nil {
 		return err
 	}
@@ -62,7 +62,7 @@ func run(c *cli.Context) error {
 			Addr:           c.String("address") + ":" + c.String("port"),
 			PublicURL:      c.String("public-url"),
 			AllowedOrigins: c.StringSlice("allowed-origins"),
-			Anonymise:      c.Bool("non-anonymised-mode"),
+			Anonymise:      !c.Bool("non-anonymised-mode"),
 		},
 	)
 	if err != nil {

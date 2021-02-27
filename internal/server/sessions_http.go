@@ -2,16 +2,17 @@ package server
 
 import (
 	"encoding/json"
+	"html/template"
 	"math/rand"
 	"net/http"
-	"text/template"
 	"time"
 
 	"github.com/brunoluiz/jornada/internal/repo"
+	"github.com/brunoluiz/jornada/internal/search/v1"
 	"github.com/brunoluiz/jornada/internal/server/view"
 	"github.com/go-chi/chi"
-	"github.com/mssola/user_agent"
 	"github.com/oklog/ulid"
+	"github.com/ua-parser/uap-go/uaparser"
 )
 
 func (s *Server) registerSessionRoutes(r *chi.Mux) error {
@@ -41,16 +42,34 @@ func (s *Server) registerSessionRoutes(r *chi.Mux) error {
 	})
 
 	r.Get("/sessions", func(w http.ResponseWriter, r *http.Request) {
-		data, err := s.sessions.GetAll(r.Context(), "", 10)
+		opts := []repo.GetOpt{}
+		query := r.URL.Query().Get("q")
+		if query != "" {
+			q, params, err := search.ToSQL(query)
+			if err != nil {
+				s.Error(w, r, err, http.StatusInternalServerError)
+				return
+			}
+			opts = append(opts, repo.WithSearchFilter(q, params))
+		}
+
+		data, err := s.sessions.Get(r.Context(), opts...)
 		if err != nil {
-			s.Error(w, r, err, http.StatusInternalServerError)
+			tmplListHTML.Execute(w, struct {
+				Sessions []repo.Session
+				URL      string
+				Query    string
+				Error    error
+			}{Sessions: data, URL: s.config.PublicURL, Query: query, Error: err})
 			return
 		}
 
 		err = tmplListHTML.Execute(w, struct {
 			Sessions []repo.Session
 			URL      string
-		}{Sessions: data, URL: s.config.PublicURL})
+			Query    string
+			Error    error
+		}{Sessions: data, URL: s.config.PublicURL, Query: query})
 		if err != nil {
 			s.Error(w, r, err, http.StatusInternalServerError)
 			return
@@ -131,17 +150,23 @@ func (s *Server) registerSessionRoutes(r *chi.Mux) error {
 				user.ID = genULID()
 			}
 
-			ua := user_agent.New(r.UserAgent())
-			browserName, browserVersion := ua.Browser()
+			parser := uaparser.NewFromSaved()
+			ua := parser.Parse(r.UserAgent())
 
 			rec := repo.Session{
 				ID:        req.GetOrCreateID(),
 				UserAgent: r.UserAgent(),
-				OS:        ua.OS(),
-				Browser:   browserName,
-				Version:   browserVersion,
-				User:      user,
-				Meta:      req.Meta,
+				Device:    ua.Device.ToString(),
+				Browser: repo.Browser{
+					Name:    ua.UserAgent.Family,
+					Version: ua.UserAgent.ToVersionString(),
+				},
+				OS: repo.OS{
+					Name:    ua.Os.Family,
+					Version: ua.Os.ToVersionString(),
+				},
+				User: user,
+				Meta: req.Meta,
 			}
 
 			if err := s.sessions.Save(r.Context(), rec); err != nil {

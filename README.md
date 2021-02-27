@@ -82,6 +82,7 @@ Add the following snippet to your app (at the end of `<body>`) and then head to 
 
 - Refer to [`docs/js_client.md`](./docs/js_client.md) for more informations about the JS client.
 - Refer to [`docs/architecture.md`](./docs/architecture.md) for more informations about the service implementation.
+- Refer to [`docs/search.md`](./docs/search.md) for more informations about how to run searches.
 
 ### Running Jornada from source
 
@@ -107,7 +108,7 @@ If you want to contribute with Jornada, you might need to run from the source. T
 - [ ] Create some test suite
 - [ ] Support database automatic clean-ups, based on configurations
 - [ ] Support for other SQL engines
-- [ ] Support filter and search (based on meta or client data)
+- [x] Support filter and search (based on meta or client data)
 - [ ] Support for player streaming/live mode (less memory consumption)
 - [ ] Support for notes and session marking
 - [ ] Support for bookmarking (could be through GA or something similar)

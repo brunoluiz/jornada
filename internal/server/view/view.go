@@ -147,15 +147,18 @@ const HTMLSessionByID = `
 					</nav>
 
 					<h2 class="mb-3">Session re-play</h2>
-					<div class="alert alert-warning" role="alert">
-						Be aware this is just a proof of concept: the storage is not optimised, searching is not possible and it is not ready for production
-					</div>
 				</div>
 			</div>
 			<div class="row mb-3">
 				<div class="col">
-					<span class="badge bg-success">{{ .Session.OS }}</span>
-					<span class="badge bg-primary">{{ .Session.Browser }} {{ .Session.Version }}</span>
+					<span class="badge bg-primary">device = '{{ .Session.Device }}'</span>
+					<span class="badge bg-primary">os.name = '{{ .Session.OS.Name }}'</span>
+					<span class="badge bg-primary">os.version = '{{ .Session.OS.Version }}'</span>
+					<span class="badge bg-secondary">browser.name = '{{ .Session.Browser.Name }}'</span>
+					<span class="badge bg-secondary">browser.version = '{{ .Session.Browser.Version }}'</span>
+					{{ range $k, $v := .Session.Meta }}
+						<span class="badge bg-info">meta.{{ $k }} = '{{ $v }}'</span>
+					{{ end }}
 				</div>
 			</div>
 		</div>
@@ -198,26 +201,39 @@ const HTMLSessionList = `
 					<li class="breadcrumb-item active" aria-current="page">Sessions</li>
 				</ol>
 			</nav>
-
 			<h2 class="mb-3">Sessions</h2>
-			<div class="alert alert-warning" role="alert">
-				Be aware this is just a proof of concept: the storage is not optimised, searching is not possible and it is not ready for production
-			</div>
+
+			<form action='/sessions' method='get'>
+				<div class="input-group mb-3">
+					<input type="text" class="form-control" placeholder="Query..." aria-label="Query" aria-describedby="button-addon2" name='q' value='{{ .Query }}' id="q">
+					<button class="btn btn-outline-secondary" type="button" onclick="document.getElementById('q').value = ''">Clear</button>
+					<input type='submit' class="btn btn-primary" id="button-addon2" value='Search'/>
+				</div>
+			</form>
+
+			{{ if .Error }}
+			<div class="alert alert-danger" role="alert">{{ .Error }}</div>
+			{{ end }}
 
 			<ul class="list-group mb-5">
 			{{ range .Sessions }}
 				<a href="/sessions/{{ .ID }}" class="list-group-item list-group-item-action">
 					<div class="d-flex w-100 justify-content-between">
 						{{ if .User.ID }}
-						<h5 class="mb-2 mt-1"><span class="badge bg-secondary">{{ .User.ID }}</span> {{ .User.Name }} </h5>
+						<h5 class="mb-2 mt-1"><span class="badge bg-dark">{{ .User.ID }}</span> {{ .User.Name }} </h5>
 						{{ else }}
-						<h5 class="mb-2 mt-1"><span class="badge bg-secondary">Anonymous user</span></h5>
+						<h5 class="mb-2 mt-1"><span class="badge bg-dark">Anonymous user</span></h5>
 						{{ end }}
 						<small class="text-muted">{{ .UpdatedAt.Format "Jan 02, 2006 15:04 UTC"  }}</small>
 					</div>
 					<p class="mb-1">
+					<span class="badge bg-primary">device = '{{ .Device }}'</span>
+					<span class="badge bg-primary">os.name = '{{ .OS.Name }}'</span>
+					<span class="badge bg-primary">os.version = '{{ .OS.Version }}'</span>
+					<span class="badge bg-secondary">browser.name = '{{ .Browser.Name }}'</span>
+					<span class="badge bg-secondary">browser.version = '{{ .Browser.Version }}'</span>
 					{{ range $k, $v := .Meta }}
-						<span class="badge bg-primary">{{ $k }} = {{ $v }}</span>
+						<span class="badge bg-info">meta.{{ $k }} = '{{ $v }}'</span>
 					{{ end }}
 					</p>
 				</a>
@@ -236,6 +252,9 @@ window.recorder
 &lt;/script&gt;
 			</pre>
 		</div>
+	<script>
+	document.getElementById("q").focus();
+	</script>
 	</body>
 </html>
 `
