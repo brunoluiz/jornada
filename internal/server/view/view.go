@@ -151,8 +151,11 @@ const HTMLSessionByID = `
 			</div>
 			<div class="row mb-3">
 				<div class="col">
-					<span class="badge bg-success">{{ .Session.OS }}</span>
-					<span class="badge bg-primary">{{ .Session.Browser }} {{ .Session.Version }}</span>
+					<span class="badge bg-primary">device = '{{ .Session.Device }}'</span>
+					<span class="badge bg-primary">os.name = '{{ .Session.OS.Name }}'</span>
+					<span class="badge bg-primary">os.version = '{{ .Session.OS.Version }}'</span>
+					<span class="badge bg-secondary">browser.name = '{{ .Session.Browser.Name }}'</span>
+					<span class="badge bg-secondary">browser.version = '{{ .Session.Browser.Version }}'</span>
 					{{ range $k, $v := .Session.Meta }}
 						<span class="badge bg-info">meta.{{ $k }} = '{{ $v }}'</span>
 					{{ end }}
