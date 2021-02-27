@@ -107,7 +107,7 @@ If you want to contribute with Jornada, you might need to run from the source. T
 - [ ] Create some test suite
 - [ ] Support database automatic clean-ups, based on configurations
 - [ ] Support for other SQL engines
-- [ ] Support filter and search (based on meta or client data)
+- [x] Support filter and search (based on meta or client data)
 - [ ] Support for player streaming/live mode (less memory consumption)
 - [ ] Support for notes and session marking
 - [ ] Support for bookmarking (could be through GA or something similar)
