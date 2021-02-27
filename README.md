@@ -82,6 +82,7 @@ Add the following snippet to your app (at the end of `<body>`) and then head to 
 
 - Refer to [`docs/js_client.md`](./docs/js_client.md) for more informations about the JS client.
 - Refer to [`docs/architecture.md`](./docs/architecture.md) for more informations about the service implementation.
+- Refer to [`docs/search.md`](./docs/search.md) for more informations about how to run searches.
 
 ### Running Jornada from source
 
