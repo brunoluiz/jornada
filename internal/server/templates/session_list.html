@@ -1,0 +1,71 @@
+<html>
+	<head>
+		<meta charset="utf-8"/>
+		<meta name="viewport" content="width=device-width, initial-scale=1.0, minimum-scale=1.0, maximum-scale=2.0, user-scalable=yes" />
+		<title>Sessions | Jornada</title>
+		<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.0.0-beta2/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-BmbxuPwQa2lc/FVzBcNJ7UAyJxM6wuqIj61tLrc4wSX0szH/Ev+nYRRuWlolflfl" crossorigin="anonymous">
+	</head>
+	<body>
+		<div class="container mt-3">
+			<nav aria-label="breadcrumb">
+				<ol class="breadcrumb">
+					<li class="breadcrumb-item active" aria-current="page">Sessions</li>
+				</ol>
+			</nav>
+			<h2 class="mb-3">Sessions</h2>
+
+			<form action='/sessions' method='get'>
+				<div class="input-group mb-3">
+					<input type="text" class="form-control" placeholder="Query..." aria-label="Query" aria-describedby="button-addon2" name='q' value='{{ .Query }}' id="q">
+					<button class="btn btn-outline-secondary" type="button" onclick="document.getElementById('q').value = ''">Clear</button>
+					<input type='submit' class="btn btn-primary" id="button-addon2" value='Search'/>
+				</div>
+			</form>
+
+			{{ if .Error }}
+			<div class="alert alert-danger" role="alert">{{ .Error }}</div>
+			{{ end }}
+
+			<ul class="list-group mb-5">
+			{{ range .Sessions }}
+				<a href="/sessions/{{ .ID }}" class="list-group-item list-group-item-action">
+					<div class="d-flex w-100 justify-content-between">
+						{{ if .User.ID }}
+						<h5 class="mb-2 mt-1"><span class="badge bg-dark">{{ .User.ID }}</span> {{ .User.Name }} </h5>
+						{{ else }}
+						<h5 class="mb-2 mt-1"><span class="badge bg-dark">Anonymous user</span></h5>
+						{{ end }}
+						<small class="text-muted">{{ .UpdatedAt.Format "Jan 02, 2006 15:04 UTC"  }}</small>
+					</div>
+					<p class="mb-1">
+					<span class="badge bg-primary">device = '{{ .Device }}'</span>
+					<span class="badge bg-primary">os.name = '{{ .OS.Name }}'</span>
+					<span class="badge bg-primary">os.version = '{{ .OS.Version }}'</span>
+					<span class="badge bg-secondary">browser.name = '{{ .Browser.Name }}'</span>
+					<span class="badge bg-secondary">browser.version = '{{ .Browser.Version }}'</span>
+					{{ range $k, $v := .Meta }}
+						<span class="badge bg-info">meta.{{ $k }} = '{{ $v }}'</span>
+					{{ end }}
+					</p>
+				</a>
+			{{ end }}
+			</ul>
+
+			<h2 class="mb-3">Start using</h2>
+			<p>Insert the following snippet at the bottom of your <code>&lt;body&gt;</code> tag:</p>
+			<pre>
+&lt;script type=&quot;application/javascript&quot; src=&quot;{{ .URL }}/record.js&quot; &gt;&lt;/script&gt;
+&lt;script type=&quot;application/javascript&quot;&gt;
+window.recorder
+  .setUser({id: 'USER_ID', email: 'test@test.com', name: 'Bruno Luiz Silva' })
+  .setMeta({ foo: 'bar' })
+  .setClientId('client-id')
+&lt;/script&gt;
+			</pre>
+		</div>
+	<script>
+	document.getElementById("q").focus();
+	</script>
+	</body>
+</html>
+

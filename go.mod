@@ -1,6 +1,6 @@
 module github.com/brunoluiz/jornada
 
-go 1.15
+go 1.16
 
 require (
 	github.com/DataDog/zstd v1.4.4 // indirect

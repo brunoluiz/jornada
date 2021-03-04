@@ -1,6 +1,7 @@
 package server
 
 import (
+	"embed"
 	"encoding/json"
 	"html/template"
 	"math/rand"
@@ -9,30 +10,28 @@ import (
 
 	"github.com/brunoluiz/jornada/internal/repo"
 	"github.com/brunoluiz/jornada/internal/search/v1"
-	"github.com/brunoluiz/jornada/internal/server/view"
 	"github.com/go-chi/chi"
 	"github.com/oklog/ulid"
 	"github.com/ua-parser/uap-go/uaparser"
 )
 
+//go:embed templates
+var templates embed.FS
+
+const (
+	templatePathRecorderJS  = "recorder.js"
+	templatePathSessionList = "session_list.html"
+	templatePathSessionByID = "session_by_id.html"
+)
+
 func (s *Server) registerSessionRoutes(r *chi.Mux) error {
-	tmplRecorder, err := template.New("recorder").Parse(view.JSRecorder)
-	if err != nil {
-		return err
-	}
-
-	tmplPlayerHTML, err := template.New("player_html").Parse(view.HTMLSessionByID)
-	if err != nil {
-		return err
-	}
-
-	tmplListHTML, err := template.New("list_html").Parse(view.HTMLSessionList)
+	t, err := template.ParseFS(templates, "templates/*")
 	if err != nil {
 		return err
 	}
 
 	r.Get("/record.js", func(w http.ResponseWriter, r *http.Request) {
-		err := tmplRecorder.Execute(w, struct {
+		err := t.ExecuteTemplate(w, templatePathRecorderJS, struct {
 			URL string
 		}{URL: s.config.PublicURL})
 		if err != nil {
@@ -55,7 +54,7 @@ func (s *Server) registerSessionRoutes(r *chi.Mux) error {
 
 		data, err := s.sessions.Get(r.Context(), opts...)
 		if err != nil {
-			tmplListHTML.Execute(w, struct {
+			t.ExecuteTemplate(w, templatePathSessionList, struct {
 				Sessions []repo.Session
 				URL      string
 				Query    string
@@ -64,7 +63,7 @@ func (s *Server) registerSessionRoutes(r *chi.Mux) error {
 			return
 		}
 
-		err = tmplListHTML.Execute(w, struct {
+		err = t.ExecuteTemplate(w, templatePathSessionList, struct {
 			Sessions []repo.Session
 			URL      string
 			Query    string
@@ -85,7 +84,7 @@ func (s *Server) registerSessionRoutes(r *chi.Mux) error {
 			return
 		}
 
-		err = tmplPlayerHTML.Execute(w, struct {
+		err = t.ExecuteTemplate(w, templatePathSessionByID, struct {
 			ID      string
 			Session repo.Session
 		}{ID: id, Session: rec})
