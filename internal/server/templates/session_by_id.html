@@ -49,6 +49,12 @@
             width: document.getElementById("player").offsetWidth,
             events: res,
           },
+          insertStyleRules: [
+            `.rr-block {
+                background: #ccc;
+                min-height: 50px;
+              }`,
+          ],
         });
       }).catch(console.error);
     </script>

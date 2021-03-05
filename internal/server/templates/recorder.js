@@ -101,18 +101,19 @@ new Promise((resolve, reject) => {
     emit(event) {
       window.recorder.events.push(event);
     },
-    // slimDOMOptions: {
-    //   script: false,
-    //   comment: false,
-    //   headFavicon: false,
-    //   headWhitespace: false,
-    //   headMetaDescKeywords: false,
-    //   headMetaSocial: false,
-    //   headMetaRobots: false,
-    //   headMetaHttpEquiv: false,
-    //   headMetaAuthorship: false,
-    //   headMetaVerification: false,
-    // },
+    collectFonts: true,
+    slimDOMOptions: {
+      script: true,
+      comment: true,
+      headFavicon: true,
+      headWhitespace: true,
+      headMetaDescKeywords: true,
+      headMetaSocial: true,
+      headMetaRobots: true,
+      headMetaHttpEquiv: true,
+      headMetaAuthorship: true,
+      headMetaVerification: true,
+    },
     // sampling: {
     //   mousemove: true,
     //   mouseInteraction: false,
