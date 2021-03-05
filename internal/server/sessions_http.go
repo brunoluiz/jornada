@@ -6,6 +6,7 @@ import (
 	"html/template"
 	"math/rand"
 	"net/http"
+	"strconv"
 	"time"
 
 	"github.com/brunoluiz/jornada/internal/repo"
@@ -22,7 +23,18 @@ const (
 	templatePathRecorderJS  = "recorder.js"
 	templatePathSessionList = "session_list.html"
 	templatePathSessionByID = "session_by_id.html"
+
+	sessionListLimit = 10
 )
+
+type sessionListParams struct {
+	Sessions []repo.Session
+	URL      string
+	Query    string
+	Error    error
+	PrevPage int
+	NextPage int
+}
 
 func (s *Server) registerSessionRoutes(r *chi.Mux) error {
 	t, err := template.ParseFS(templates, "templates/*")
@@ -41,8 +53,13 @@ func (s *Server) registerSessionRoutes(r *chi.Mux) error {
 	})
 
 	r.Get("/sessions", func(w http.ResponseWriter, r *http.Request) {
-		opts := []repo.GetOpt{}
 		query := r.URL.Query().Get("q")
+		page, err := strconv.Atoi(r.URL.Query().Get("page"))
+		if err != nil {
+			page = 0
+		}
+		opts := []repo.GetOpt{repo.WithPagination(uint64(page)*sessionListLimit, sessionListLimit)}
+
 		if query != "" {
 			q, params, err := search.ToSQL(query)
 			if err != nil {
@@ -54,21 +71,22 @@ func (s *Server) registerSessionRoutes(r *chi.Mux) error {
 
 		data, err := s.sessions.Get(r.Context(), opts...)
 		if err != nil {
-			t.ExecuteTemplate(w, templatePathSessionList, struct {
-				Sessions []repo.Session
-				URL      string
-				Query    string
-				Error    error
-			}{Sessions: data, URL: s.config.PublicURL, Query: query, Error: err})
+			t.ExecuteTemplate(w, templatePathSessionList, sessionListParams{Sessions: data, URL: s.config.PublicURL, Query: query, Error: err, NextPage: -1, PrevPage: -1})
 			return
 		}
 
-		err = t.ExecuteTemplate(w, templatePathSessionList, struct {
-			Sessions []repo.Session
-			URL      string
-			Query    string
-			Error    error
-		}{Sessions: data, URL: s.config.PublicURL, Query: query})
+		nextPage := page + 1
+		if len(data) < sessionListLimit {
+			nextPage = -1
+		}
+
+		err = t.ExecuteTemplate(w, templatePathSessionList, sessionListParams{
+			Sessions: data,
+			URL:      s.config.PublicURL,
+			Query:    query,
+			NextPage: nextPage,
+			PrevPage: page - 1,
+		})
 		if err != nil {
 			s.Error(w, r, err, http.StatusInternalServerError)
 			return

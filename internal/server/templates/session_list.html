@@ -51,6 +51,17 @@
       {{ end }}
       </ul>
 
+    <nav aria-label="sessions navigation">
+      <ul class="pagination justify-content-end">
+        {{ if ge .PrevPage 0  }}
+        <li class="page-item"><a class="page-link" tabindex="-1" href="/sessions?page={{ .PrevPage }}">Previous</a></li>
+        {{ end }}
+        {{ if ge .NextPage 0 }}
+        <li class="page-item"><a class="page-link" href="/sessions?page={{ .NextPage }}">Next</a></li>
+        {{ end }}
+      </ul>
+    </nav>
+
       <h2 class="mb-3">Start using</h2>
       <p>Insert the following snippet at the bottom of your <code>&lt;body&gt;</code> tag:</p>
       <pre>

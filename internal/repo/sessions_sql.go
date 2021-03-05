@@ -175,6 +175,12 @@ func WithSearchFilter(cond string, params []interface{}) func(b *sq.SelectBuilde
 	}
 }
 
+func WithPagination(offset uint64, limit uint64) func(b *sq.SelectBuilder) {
+	return func(b *sq.SelectBuilder) {
+		*b = b.Offset(offset).Limit(limit)
+	}
+}
+
 // Get get all available resources
 func (store *SessionSQL) Get(ctx context.Context, opts ...GetOpt) (out []Session, err error) {
 	q := sq.Select(`s.id, s.client_id, s.user_agent, device, os.name, os.version, browser.name, browser.version, s.updated_at, s.meta, user.id, user.name, user.email`).
