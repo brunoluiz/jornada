@@ -1,57 +1,57 @@
 <html>
-	<head>
-		<meta charset="utf-8"/>
-		<meta name="viewport" content="width=device-width, initial-scale=1.0, minimum-scale=1.0, maximum-scale=2.0, user-scalable=yes" />
-		<title>Play | Jornada</title>
-		<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.0.0-beta2/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-BmbxuPwQa2lc/FVzBcNJ7UAyJxM6wuqIj61tLrc4wSX0szH/Ev+nYRRuWlolflfl" crossorigin="anonymous" />
-		<link href="https://cdn.jsdelivr.net/npm/rrweb-player@latest/dist/style.css" rel="stylesheet" />
-	</head>
-	<body>
-		<div class="main container mt-3">
-			<div class="row">
-				<div class="col">
-					<nav aria-label="breadcrumb">
-						<ol class="breadcrumb">
-							<li class="breadcrumb-item"><a href="/">Sessions</a></li>
-							<li class="breadcrumb-item active" aria-current="page">Player</li>
-						</ol>
-					</nav>
+  <head>
+    <meta charset="utf-8"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, minimum-scale=1.0, maximum-scale=2.0, user-scalable=yes" />
+    <title>Play | Jornada</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.0.0-beta2/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-BmbxuPwQa2lc/FVzBcNJ7UAyJxM6wuqIj61tLrc4wSX0szH/Ev+nYRRuWlolflfl" crossorigin="anonymous" />
+    <link href="https://cdn.jsdelivr.net/npm/rrweb-player@latest/dist/style.css" rel="stylesheet" />
+  </head>
+  <body>
+    <div class="main container mt-3">
+      <div class="row">
+        <div class="col">
+          <nav aria-label="breadcrumb">
+            <ol class="breadcrumb">
+              <li class="breadcrumb-item"><a href="/">Sessions</a></li>
+              <li class="breadcrumb-item active" aria-current="page">Player</li>
+            </ol>
+          </nav>
 
-					<h2 class="mb-3">Session re-play</h2>
-				</div>
-			</div>
-			<div class="row mb-3">
-				<div class="col">
-					<span class="badge bg-primary">device = '{{ .Session.Device }}'</span>
-					<span class="badge bg-primary">os.name = '{{ .Session.OS.Name }}'</span>
-					<span class="badge bg-primary">os.version = '{{ .Session.OS.Version }}'</span>
-					<span class="badge bg-secondary">browser.name = '{{ .Session.Browser.Name }}'</span>
-					<span class="badge bg-secondary">browser.version = '{{ .Session.Browser.Version }}'</span>
-					{{ range $k, $v := .Session.Meta }}
-						<span class="badge bg-info">meta.{{ $k }} = '{{ $v }}'</span>
-					{{ end }}
-				</div>
-			</div>
-		</div>
-		<div class="container mb-3" id="player">
-		</div>
-		<script type="application/javascript" src="https://cdn.jsdelivr.net/npm/rrweb-player@latest/dist/index.js" ></script>
-		<script type="application/javascript" src="https://cdn.jsdelivr.net/npm/rrweb@0.9.14/dist/rrweb.min.js" ></script>
-		<script type="application/javascript">
-			fetch('/api/v1/sessions/{{ .ID }}/events', {
-				method: 'GET',
-			})
-			.then(res => res.json())
-			.then((res) => {
-				new rrwebPlayer({
-					target: document.getElementById("player"), // customizable root element
-					props: {
-						width: document.getElementById("player").offsetWidth,
-						events: res,
-					},
-				});
-			}).catch(console.error);
-		</script>
-	</body>
+          <h2 class="mb-3">Session re-play</h2>
+        </div>
+      </div>
+      <div class="row mb-3">
+        <div class="col">
+          <span class="badge bg-primary">device = '{{ .Session.Device }}'</span>
+          <span class="badge bg-primary">os.name = '{{ .Session.OS.Name }}'</span>
+          <span class="badge bg-primary">os.version = '{{ .Session.OS.Version }}'</span>
+          <span class="badge bg-secondary">browser.name = '{{ .Session.Browser.Name }}'</span>
+          <span class="badge bg-secondary">browser.version = '{{ .Session.Browser.Version }}'</span>
+          {{ range $k, $v := .Session.Meta }}
+            <span class="badge bg-info">meta.{{ $k }} = '{{ $v }}'</span>
+          {{ end }}
+        </div>
+      </div>
+    </div>
+    <div class="container mb-3" id="player">
+    </div>
+    <script type="application/javascript" src="https://cdn.jsdelivr.net/npm/rrweb-player@latest/dist/index.js" ></script>
+    <script type="application/javascript" src="https://cdn.jsdelivr.net/npm/rrweb@0.9.14/dist/rrweb.min.js" ></script>
+    <script type="application/javascript">
+      fetch('/api/v1/sessions/{{ .ID }}/events', {
+        method: 'GET',
+      })
+      .then(res => res.json())
+      .then((res) => {
+        new rrwebPlayer({
+          target: document.getElementById("player"), // customizable root element
+          props: {
+            width: document.getElementById("player").offsetWidth,
+            events: res,
+          },
+        });
+      }).catch(console.error);
+    </script>
+  </body>
 </html>
 

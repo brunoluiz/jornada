@@ -101,14 +101,14 @@ If you want to contribute with Jornada, you might need to run from the source. T
 - [x] Create events storage
 - [x] Create GDRP safe-mode
 - [x] Automatic release set-up w/ CGO
-- [ ] Automatic payload sanitisation (rrweb doesn't sanitise passwords by default)
-- [ ] Tweak SQLite
+- [x] Support filter and search (based on meta or client data)
 - [x] Support for metrics
+- [ ] Paginate results
+- [ ] Support database automatic clean-ups, based on configurations
+- [ ] Tweak SQLite
 - [ ] Test this with big traffic to understand how SQLite and BadgerDB will behave
 - [ ] Create some test suite
-- [ ] Support database automatic clean-ups, based on configurations
 - [ ] Support for other SQL engines
-- [x] Support filter and search (based on meta or client data)
 - [ ] Support for player streaming/live mode (less memory consumption)
 - [ ] Support for notes and session marking
 - [ ] Support for bookmarking (could be through GA or something similar)
