@@ -104,7 +104,7 @@ If you want to contribute with Jornada, you might need to run from the source. T
 - [x] Support filter and search (based on meta or client data)
 - [x] Support for metrics
 - [x] Paginate results
-- [ ] Support database automatic clean-ups, based on configurations
+- [x] Support database automatic clean-ups, based on configurations
 - [ ] Nice error pages
 - [ ] SQL hooks for query logging and timing (or tracing of some sort)
 - [ ] Tweak SQLite

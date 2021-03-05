@@ -71,7 +71,8 @@ func (s *Server) registerSessionRoutes(r *chi.Mux) error {
 
 		data, err := s.sessions.Get(r.Context(), opts...)
 		if err != nil {
-			t.ExecuteTemplate(w, templatePathSessionList, sessionListParams{Sessions: data, URL: s.config.PublicURL, Query: query, Error: err, NextPage: -1, PrevPage: -1})
+			err = t.ExecuteTemplate(w, templatePathSessionList, sessionListParams{Sessions: data, URL: s.config.PublicURL, Query: query, Error: err, NextPage: -1, PrevPage: -1})
+			s.Error(w, r, err, http.StatusInternalServerError)
 			return
 		}
 

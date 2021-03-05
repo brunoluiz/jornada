@@ -72,6 +72,56 @@ func (store *EventBadgerV2) Get(ctx context.Context, sessionID string, cb func(b
 	})
 }
 
+// Delete delete a specified set of IDs
+func (store *EventBadgerV2) Delete(ctx context.Context, ids ...string) error {
+	collectSize := 100000
+	return store.db.View(func(txn *badger.Txn) error {
+		opts := badger.DefaultIteratorOptions
+		opts.AllVersions = false
+		opts.PrefetchValues = false
+		it := txn.NewIterator(opts)
+		defer it.Close()
+
+		keysForDelete := make([][]byte, 0, collectSize)
+		keysCollected := 0
+		for _, id := range ids {
+			sessionID := id
+
+			for it.Seek(store.messageKey(sessionID, 1)); it.ValidForPrefix([]byte(store.id(sessionID))); it.Next() {
+				key := it.Item().KeyCopy(nil)
+				keysForDelete = append(keysForDelete, key)
+				keysCollected++
+				if keysCollected == collectSize {
+					if err := store.deleteKeys(keysForDelete); err != nil {
+						return err
+					}
+					keysForDelete = make([][]byte, 0, collectSize)
+					keysCollected = 0
+				}
+			}
+		}
+
+		if keysCollected > 0 {
+			if err := store.deleteKeys(keysForDelete); err != nil {
+				return err
+			}
+		}
+
+		return nil
+	})
+}
+
+func (store *EventBadgerV2) deleteKeys(keysForDelete [][]byte) error {
+	return store.db.Update(func(txn *badger.Txn) error {
+		for _, key := range keysForDelete {
+			if err := txn.Delete(key); err != nil {
+				return err
+			}
+		}
+		return nil
+	})
+}
+
 // lastSequence gets last ID saved in DB
 func (store *EventBadgerV2) lastSequence(tx *badger.Txn, id string) (uint64, error) {
 	it := tx.NewIterator(badger.IteratorOptions{

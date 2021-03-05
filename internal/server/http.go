@@ -91,7 +91,7 @@ func New(
 }
 
 // Run start serving requests through configurations done in *Server
-func (s *Server) Run() error {
+func (s *Server) Run(_ context.Context) error {
 	s.log.Infof("Running ⚡️ %s", s.config.Addr)
 	return s.server.ListenAndServe()
 }
@@ -106,6 +106,10 @@ func (s *Server) Close() error {
 
 // Error handle http errors
 func (s *Server) Error(w http.ResponseWriter, r *http.Request, err error, code int) {
+	if err == nil {
+		return
+	}
+
 	s.log.Error(err)
 	http.Error(w, err.Error(), code)
 }

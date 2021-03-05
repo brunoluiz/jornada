@@ -22,7 +22,7 @@ func ToSQL(in string) (out string, params []interface{}, err error) {
 	// Replace all " with '
 	out = strings.ReplaceAll(in, "\"", "'")
 
-	// Replace all possibily dangerous expressions
+	// Replace all possible dangerous expressions
 	out = dangerousRegex.ReplaceAllString(in, "")
 
 	// Transform all `meta.foo = 'bar'` into `meta.key = 'foo' and meta.value = 'bar'`

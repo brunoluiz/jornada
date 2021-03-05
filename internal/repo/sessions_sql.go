@@ -27,11 +27,13 @@ type (
 		Name  string `json:"name"`
 	}
 
+	// OS details about session's OS
 	OS struct {
 		Name    string `json:"name"`
 		Version string `json:"version"`
 	}
 
+	// Browser details about session's browser
 	Browser struct {
 		Name    string `json:"name"`
 		Version string `json:"version"`
@@ -51,6 +53,7 @@ type (
 		UpdatedAt time.Time         `json:"updatedAt"`
 	}
 
+	// GetOpt configure Get query builder
 	GetOpt func(b *sq.SelectBuilder)
 )
 
@@ -169,15 +172,24 @@ func (store *SessionSQL) GetByID(ctx context.Context, id string) (out Session, e
 	return res[0], nil
 }
 
+// WithSearchFilter filter query using search/v1 query output
 func WithSearchFilter(cond string, params []interface{}) func(b *sq.SelectBuilder) {
 	return func(b *sq.SelectBuilder) {
 		*b = b.Where(cond, params...)
 	}
 }
 
+// WithPagination filter query with offset and limit
 func WithPagination(offset uint64, limit uint64) func(b *sq.SelectBuilder) {
 	return func(b *sq.SelectBuilder) {
 		*b = b.Offset(offset).Limit(limit)
+	}
+}
+
+// WithUpdatedAtUntil filter query with updated_at <= time.Time
+func WithUpdatedAtUntil(updatedAt time.Time) func(b *sq.SelectBuilder) {
+	return func(b *sq.SelectBuilder) {
+		*b = b.Where("updated_at <= ?", updatedAt)
 	}
 }
 
@@ -220,7 +232,19 @@ func (store *SessionSQL) Get(ctx context.Context, opts ...GetOpt) (out []Session
 	return out, nil
 }
 
-func scanSession(rs *sql.Rows) (Session, error) {
+// Delete delete a specified set of IDs
+func (store *SessionSQL) Delete(ctx context.Context, ids ...string) error {
+	q := sq.Delete("sessions").Where(sq.Eq{"id": ids})
+	sql, params, err := q.ToSql()
+	if err != nil {
+		return err
+	}
+
+	_, err = store.db.ExecContext(ctx, sql, params...)
+	return err
+}
+
+func scanSession(rs sq.RowScanner) (Session, error) {
 	var meta []byte
 	var session Session
 	err := rs.Scan(
