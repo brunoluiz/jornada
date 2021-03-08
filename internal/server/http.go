@@ -91,9 +91,21 @@ func New(
 }
 
 // Run start serving requests through configurations done in *Server
-func (s *Server) Run(_ context.Context) error {
+func (s *Server) Run(ctx context.Context) error {
 	s.log.Infof("Running ⚡️ %s", s.config.Addr)
-	return s.server.ListenAndServe()
+	cerr := make(chan error)
+	go func() {
+		if err := s.server.ListenAndServe(); err != nil {
+			cerr <- err
+		}
+	}()
+
+	select {
+	case err := <-cerr:
+		return err
+	case <-ctx.Done():
+		return nil
+	}
 }
 
 // Close http server graceful shutdown
