@@ -20,7 +20,6 @@ import (
 var templates embed.FS
 
 const (
-	templatePathRecorderJS  = "recorder.js"
 	templatePathSessionList = "session_list.html"
 	templatePathSessionByID = "session_by_id.html"
 
@@ -41,16 +40,6 @@ func (s *Server) registerSessionRoutes(r *chi.Mux) error {
 	if err != nil {
 		return err
 	}
-
-	r.Get("/record.js", func(w http.ResponseWriter, r *http.Request) {
-		err := t.ExecuteTemplate(w, templatePathRecorderJS, struct {
-			URL string
-		}{URL: s.config.PublicURL})
-		if err != nil {
-			s.Error(w, r, err, http.StatusInternalServerError)
-			return
-		}
-	})
 
 	r.Get("/sessions", func(w http.ResponseWriter, r *http.Request) {
 		query := r.URL.Query().Get("q")
