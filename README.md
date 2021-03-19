@@ -108,7 +108,6 @@ If you want to contribute with Jornada, you might need to run from the source. T
 - [x] Support database automatic clean-ups, based on configurations
 - [x] Extract client code
 - [ ] Nice error pages
-- [ ] SQL hooks for query logging and timing (or tracing of some sort)
 - [ ] Tweak SQLite
 - [ ] Test this with big traffic to understand how SQLite and BadgerDB will behave
 - [ ] Create some test suite
