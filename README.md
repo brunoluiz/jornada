@@ -12,9 +12,6 @@ If you have a live website, users will be interacting with it. But recording the
 - Debug reported issues
 - User behaviour and experience analysis
 
-> ☢️ WARNING: although this version is way better than the [original prototype hack code][1], this project is still under development and
-> is not recommended for developers with severe hacky code alergy. ☢️
-
 ![](./docs/demo.gif)
 
 
@@ -59,28 +56,32 @@ Use one of the distributions above to fetch a binary. Before running, bear in mi
 
 ### Client
 
-Add the following snippet to your app (at the end of `<body>`) and then head to `http://localhost:3000` to see recorded sessions
+First, Install the `@brunoluiz/jornada` module in your application:
+
+```
+npm install @brunoluiz/jornada # for npm users
+yarn add @brunoluiz/jornada # for yarn users
+```
+
+Then add the following snippet to your app (at the end of `<body>`) and then head to `http://localhost:3000` to see recorded sessions
 
 ```js
-<script type="application/javascript" src="http://localhost:3000/record.js" ></script>
-<script type="application/javascript">
-  // Once record.js is imported, the setter functions can be called at any point in your application
-  window.recorder
-    .setUser({
-      id: 'USER_ID',
-      email: 'test@test.com',
-      name: 'Bruno Luiz Silva'
-    })
-    .setMeta({ foo: 'bar' })
-    .setClientId('client-id')
-</script>
+import { Jornada } from '@brunoluiz/jornada';
+
+Jornada.init({ apiUrl: 'http://localhost:3000' })
+  .setUser({ id: 'USER_ID', email: 'test@test.com', name: 'Bruno Luiz Silva' })
+  .setMeta({ foo: 'bar', bruno: 'silva' })
+  .setClientId('jtc-id')
+  .start();
 ```
+
+**⚠️ Bear in mind that, if you server is running in anonymised mode, it will not save user information.**
 
 ## Development
 
 ### Architecture & Documentation
 
-- Refer to [`docs/js_client.md`](./docs/js_client.md) for more informations about the JS client.
+- Refer to [`github:jornada-client`](https://github.com/brunoluiz/jornada-client) for more informations about the JS client.
 - Refer to [`docs/architecture.md`](./docs/architecture.md) for more informations about the service implementation.
 - Refer to [`docs/search.md`](./docs/search.md) for more informations about how to run searches.
 
@@ -105,6 +106,7 @@ If you want to contribute with Jornada, you might need to run from the source. T
 - [x] Support for metrics
 - [x] Paginate results
 - [x] Support database automatic clean-ups, based on configurations
+- [x] Extract client code
 - [ ] Nice error pages
 - [ ] SQL hooks for query logging and timing (or tracing of some sort)
 - [ ] Tweak SQLite
@@ -115,6 +117,3 @@ If you want to contribute with Jornada, you might need to run from the source. T
 - [ ] Support for notes and session marking
 - [ ] Support for bookmarking (could be through GA or something similar)
 - [ ] Create OpenAPI schemas
-
-
-[1]: https://gist.github.com/brunoluiz/96f111071f3a483ced13f57514707595
