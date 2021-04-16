@@ -23,7 +23,8 @@ func main() {
 			&cli.StringFlag{Name: "public-url", Value: "http://localhost:3000", EnvVars: []string{"PUBLIC_URL"}, Usage: "Public URL where the service is exposed. The service might be running on :3000, but the public access can be proxied through 80"},
 			&cli.BoolFlag{Name: "non-anonymised-mode", EnvVars: []string{"NON_ANONYMISED_MODE"}, Usage: "If set, it will allow user details to be recorded"},
 			&cli.StringFlag{Name: "address", Value: "0.0.0.0", EnvVars: []string{"ADDRESS"}, Usage: "Service address -- change to 127.0.0.1 if developing on Mac (avoids network warnings)"},
-			&cli.StringFlag{Name: "port", Value: "3000", EnvVars: []string{"PORT"}, Usage: "Service port"},
+			&cli.StringFlag{Name: "port", Value: "3000", EnvVars: []string{"PORT"}, Usage: "Service port for public service"},
+			&cli.StringFlag{Name: "admin-port", Value: "3001", EnvVars: []string{"ADMIN_PORT"}, Usage: "Service port for admin service"},
 			&cli.StringSliceFlag{Name: "allowed-origins", Value: cli.NewStringSlice("*"), EnvVars: []string{"ALLOWED_ORIGINS"}, Usage: "CORS allowed origins"},
 			&cli.StringFlag{Name: "db-dsn", Value: "sqlite:///tmp/jornada.db?cache=shared&mode=rwc&_journal_mode=WAL", EnvVars: []string{"DB_DSN"}, Usage: "DSN for SQL database (see github.com/mattn/go-sqlite3 for more options)"},
 			&cli.StringFlag{Name: "events-dsn", Value: "badger:///tmp/jornada.events", EnvVars: []string{"EVENTS_DSN"}, Usage: "Events storage path (BadgerDB)"},
@@ -62,7 +63,7 @@ func run(c *cli.Context) error {
 
 	clean := cleaner.New(c.Duration("storage-max-age"), recordings, events)
 
-	svc, err := server.New(
+	publicSvc := server.NewPublic(
 		log,
 		recordings,
 		events,
@@ -73,11 +74,21 @@ func run(c *cli.Context) error {
 			Anonymise:      !c.Bool("non-anonymised-mode"),
 		},
 	)
+
+	adminSvc, err := server.NewAdmin(
+		log,
+		recordings,
+		events,
+		server.Config{
+			Addr:      c.String("address") + ":" + c.String("admin-port"),
+			PublicURL: c.String("public-url"),
+		},
+	)
 	if err != nil {
 		return err
 	}
 
-	return waiter(ctx, clean.Run, svc.Run)
+	return waiter(ctx, clean.Run, publicSvc.Run, adminSvc.Run)
 }
 
 func waiter(ctx context.Context, runners ...func(context.Context) error) error {

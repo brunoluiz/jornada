@@ -4,15 +4,12 @@ import (
 	"embed"
 	"encoding/json"
 	"html/template"
-	"math/rand"
 	"net/http"
 	"strconv"
-	"time"
 
 	"github.com/brunoluiz/jornada/internal/repo"
 	"github.com/brunoluiz/jornada/internal/search/v1"
 	"github.com/go-chi/chi"
-	"github.com/oklog/ulid"
 	"github.com/ua-parser/uap-go/uaparser"
 )
 
@@ -35,13 +32,17 @@ type sessionListParams struct {
 	NextPage int
 }
 
-func (s *Server) registerSessionRoutes(r *chi.Mux) error {
+func registerAdminRoutes(s *Server) error {
 	t, err := template.ParseFS(templates, "templates/*")
 	if err != nil {
 		return err
 	}
 
-	r.Get("/sessions", func(w http.ResponseWriter, r *http.Request) {
+	s.router.Get("/", func(w http.ResponseWriter, r *http.Request) {
+		http.Redirect(w, r, "/sessions", http.StatusTemporaryRedirect)
+	})
+
+	s.router.Get("/sessions", func(w http.ResponseWriter, r *http.Request) {
 		query := r.URL.Query().Get("q")
 		page, err := strconv.Atoi(r.URL.Query().Get("page"))
 		if err != nil {
@@ -83,7 +84,7 @@ func (s *Server) registerSessionRoutes(r *chi.Mux) error {
 		}
 	})
 
-	r.Get("/sessions/{id}", func(w http.ResponseWriter, r *http.Request) {
+	s.router.Get("/sessions/{id}", func(w http.ResponseWriter, r *http.Request) {
 		id := chi.URLParam(r, "id")
 
 		rec, err := s.sessions.GetByID(r.Context(), id)
@@ -102,7 +103,7 @@ func (s *Server) registerSessionRoutes(r *chi.Mux) error {
 		}
 	})
 
-	r.Route("/api/v1/sessions", func(r chi.Router) {
+	s.router.Route("/api/v1/sessions", func(r chi.Router) {
 		r.Get("/{id}", func(w http.ResponseWriter, r *http.Request) {
 			id := chi.URLParam(r, "id")
 
@@ -142,84 +143,80 @@ func (s *Server) registerSessionRoutes(r *chi.Mux) error {
 				return
 			}
 		})
-
-		r.Post("/", func(w http.ResponseWriter, r *http.Request) {
-			var req repo.Session
-			if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-				s.Error(w, r, err, http.StatusInternalServerError)
-				return
-			}
-
-			user := req.User
-			if s.config.Anonymise {
-				user = repo.User{}
-			} else if user.ID == "" {
-				user.ID = genULID()
-			}
-
-			parser := uaparser.NewFromSaved()
-			ua := parser.Parse(r.UserAgent())
-
-			rec := repo.Session{
-				ID:        req.GetOrCreateID(),
-				UserAgent: r.UserAgent(),
-				Device:    ua.Device.ToString(),
-				Browser: repo.Browser{
-					Name:    ua.UserAgent.Family,
-					Version: ua.UserAgent.ToVersionString(),
-				},
-				OS: repo.OS{
-					Name:    ua.Os.Family,
-					Version: ua.Os.ToVersionString(),
-				},
-				User: user,
-				Meta: req.Meta,
-			}
-
-			if err := s.sessions.Save(r.Context(), rec); err != nil {
-				s.Error(w, r, err, http.StatusInternalServerError)
-				return
-			}
-
-			if err := json.NewEncoder(w).Encode(&rec); err != nil {
-				s.Error(w, r, err, http.StatusInternalServerError)
-				return
-			}
-		})
-
-		r.Put("/{id}/events", func(w http.ResponseWriter, r *http.Request) {
-			id := chi.URLParam(r, "id")
-
-			req := []interface{}{}
-			if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-				s.Error(w, r, err, http.StatusInternalServerError)
-				return
-			}
-
-			jsons := [][]byte{}
-			for _, v := range req {
-				event, err := json.Marshal(v)
-				if err != nil {
-					s.Error(w, r, err, http.StatusInternalServerError)
-					return
-				}
-				jsons = append(jsons, event)
-			}
-
-			if err := s.events.Add(r.Context(), id, jsons...); err != nil {
-				s.Error(w, r, err, http.StatusInternalServerError)
-				return
-			}
-
-			w.WriteHeader(http.StatusOK)
-		})
 	})
 
 	return nil
 }
 
-func genULID() string {
-	t := time.Now()
-	//nolint
-	return ulid.MustNew(ulid.Timestamp(t), ulid.Monotonic(rand.New(rand.NewSource(t.UnixNano())), 0)).String()
+func registerSessionRoutes(s *Server) {
+	s.router.Post("/api/v1/sessions", func(w http.ResponseWriter, r *http.Request) {
+		var req repo.Session
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			s.Error(w, r, err, http.StatusInternalServerError)
+			return
+		}
+
+		user := req.User
+		if s.config.Anonymise {
+			user = repo.User{}
+		} else if user.ID == "" {
+			user.ID = genULID()
+		}
+
+		parser := uaparser.NewFromSaved()
+		ua := parser.Parse(r.UserAgent())
+
+		rec := repo.Session{
+			ID:        req.GetOrCreateID(),
+			UserAgent: r.UserAgent(),
+			Device:    ua.Device.ToString(),
+			Browser: repo.Browser{
+				Name:    ua.UserAgent.Family,
+				Version: ua.UserAgent.ToVersionString(),
+			},
+			OS: repo.OS{
+				Name:    ua.Os.Family,
+				Version: ua.Os.ToVersionString(),
+			},
+			User: user,
+			Meta: req.Meta,
+		}
+
+		if err := s.sessions.Save(r.Context(), rec); err != nil {
+			s.Error(w, r, err, http.StatusInternalServerError)
+			return
+		}
+
+		if err := json.NewEncoder(w).Encode(&rec); err != nil {
+			s.Error(w, r, err, http.StatusInternalServerError)
+			return
+		}
+	})
+
+	s.router.Put("/api/v1/sessions/{id}/events", func(w http.ResponseWriter, r *http.Request) {
+		id := chi.URLParam(r, "id")
+
+		req := []interface{}{}
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			s.Error(w, r, err, http.StatusInternalServerError)
+			return
+		}
+
+		jsons := [][]byte{}
+		for _, v := range req {
+			event, err := json.Marshal(v)
+			if err != nil {
+				s.Error(w, r, err, http.StatusInternalServerError)
+				return
+			}
+			jsons = append(jsons, event)
+		}
+
+		if err := s.events.Add(r.Context(), id, jsons...); err != nil {
+			s.Error(w, r, err, http.StatusInternalServerError)
+			return
+		}
+
+		w.WriteHeader(http.StatusOK)
+	})
 }

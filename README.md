@@ -47,11 +47,14 @@ Use one of the distributions above to fetch a binary. Before running, bear in mi
    --public-url value       Public URL where the service is exposed. The service might be running on :3000, but the public access can be proxied through 80 (default: "http://localhost:3000") [$PUBLIC_URL]
    --non-anonymised-mode    If set, it will allow user details to be recorded (default: false) [$NON_ANONYMISED_MODE]
    --address value          Service address -- change to 127.0.0.1 if developing on Mac (avoids network warnings) (default: "0.0.0.0") [$ADDRESS]
-   --port value             Service port (default: "3000") [$PORT]
+   --port value             Service port for public service (default: "3000") [$PORT]
+   --admin-port value       Service port for admin service (default: "3001") [$ADMIN_PORT]
    --allowed-origins value  CORS allowed origins (default: "*") [$ALLOWED_ORIGINS]
    --db-dsn value           DSN for SQL database (see github.com/mattn/go-sqlite3 for more options) (default: "sqlite:///tmp/jornada.db?cache=shared&mode=rwc&_journal_mode=WAL") [$DB_DSN]
    --events-dsn value       Events storage path (BadgerDB) (default: "badger:///tmp/jornada.events") [$EVENTS_DSN]
+   --storage-max-age value  How long should Jornada keep sessions stored in database (14 days by default) (default: 336h0m0s) [$STORAGE_MAX_AGE]
    --log-level value        Log level (default: "info") [$LOG_LEVEL]
+   --help, -h               show help (default: false)
 ```
 
 ### Client
@@ -63,7 +66,7 @@ npm install @brunoluiz/jornada # for npm users
 yarn add @brunoluiz/jornada # for yarn users
 ```
 
-Then add the following snippet to your app (at the end of `<body>`) and then head to `http://localhost:3000` to see recorded sessions
+Then add the following snippet to your app (at the end of `<body>`) and then head to `http://localhost:3001` to see recorded sessions
 
 ```js
 import { Jornada } from '@brunoluiz/jornada';

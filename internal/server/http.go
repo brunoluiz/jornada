@@ -2,6 +2,7 @@ package server
 
 import (
 	"context"
+	"math/rand"
 	"net/http"
 	"time"
 
@@ -9,6 +10,7 @@ import (
 	"github.com/go-chi/chi"
 	"github.com/go-chi/chi/middleware"
 	"github.com/go-chi/cors"
+	"github.com/oklog/ulid"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/sirupsen/logrus"
 )
@@ -42,52 +44,6 @@ type Config struct {
 	PublicURL      string
 	AllowedOrigins []string
 	Anonymise      bool
-}
-
-// New returns an HTTP server, initialising routes and middlewares
-func New(
-	log *logrus.Logger,
-	sessions SessionRepository,
-	events EventRepository,
-	config Config,
-) (*Server, error) {
-	s := &Server{
-		config:   config,
-		log:      log,
-		router:   chi.NewRouter(),
-		sessions: sessions,
-		events:   events,
-	}
-
-	s.router.Use(middleware.RequestID)
-	s.router.Use(middleware.RealIP)
-	s.router.Use(middleware.Recoverer)
-	s.router.Use(middleware.Timeout(60 * time.Second))
-	s.router.Use(cors.Handler(cors.Options{
-		AllowedOrigins: config.AllowedOrigins,
-		AllowedMethods: []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
-		AllowedHeaders: []string{"Accept", "Authorization", "Content-Type", "X-CSRF-Token"},
-	}))
-
-	s.router.Handle("/__/metrics", promhttp.Handler())
-	s.router.Mount("/__/debug", middleware.Profiler())
-	s.router.Get("/", func(w http.ResponseWriter, r *http.Request) {
-		http.Redirect(w, r, "/sessions", http.StatusTemporaryRedirect)
-	})
-
-	if err := s.registerSessionRoutes(s.router); err != nil {
-		return nil, err
-	}
-
-	s.server = &http.Server{
-		Addr:         config.Addr,
-		Handler:      http.HandlerFunc(s.router.ServeHTTP),
-		ReadTimeout:  5 * time.Second,
-		WriteTimeout: 5 * time.Second,
-		IdleTimeout:  120 * time.Second,
-	}
-
-	return s, nil
 }
 
 // Run start serving requests through configurations done in *Server
@@ -124,4 +80,95 @@ func (s *Server) Error(w http.ResponseWriter, r *http.Request, err error, code i
 
 	s.log.Error(err)
 	http.Error(w, err.Error(), code)
+}
+
+// New returns an HTTP server, initialising routes and middlewares
+func New(
+	log *logrus.Logger,
+	sessions SessionRepository,
+	events EventRepository,
+	config Config,
+) *Server {
+	s := &Server{
+		config:   config,
+		log:      log,
+		router:   chi.NewRouter(),
+		sessions: sessions,
+		events:   events,
+	}
+
+	s.router.Use(middleware.RequestID)
+	s.router.Use(middleware.RealIP)
+	s.router.Use(middleware.Recoverer)
+	s.router.Use(middleware.Timeout(60 * time.Second))
+	s.router.Use(cors.Handler(cors.Options{
+		AllowedOrigins: config.AllowedOrigins,
+		AllowedMethods: []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
+		AllowedHeaders: []string{"Accept", "Authorization", "Content-Type", "X-CSRF-Token"},
+	}))
+
+	s.router.Handle("/__/metrics", promhttp.Handler())
+	s.router.Mount("/__/debug", middleware.Profiler())
+
+	s.server = &http.Server{
+		Addr:         config.Addr,
+		Handler:      http.HandlerFunc(s.router.ServeHTTP),
+		ReadTimeout:  5 * time.Second,
+		WriteTimeout: 5 * time.Second,
+		IdleTimeout:  120 * time.Second,
+	}
+
+	return s
+}
+
+// NewAdmin Returns the admin HTTP server.
+func NewAdmin(
+	log *logrus.Logger,
+	sessions SessionRepository,
+	events EventRepository,
+	config Config,
+) (*Server, error) {
+	s := New(log, sessions, events, config)
+
+	if err := registerAdminRoutes(s); err != nil {
+		return nil, err
+	}
+
+	s.server = &http.Server{
+		Addr:         config.Addr,
+		Handler:      http.HandlerFunc(s.router.ServeHTTP),
+		ReadTimeout:  5 * time.Second,
+		WriteTimeout: 5 * time.Second,
+		IdleTimeout:  120 * time.Second,
+	}
+
+	return s, nil
+}
+
+// NewPublic Returns the HTTP server with the public APIs, used by jornda client.
+func NewPublic(
+	log *logrus.Logger,
+	sessions SessionRepository,
+	events EventRepository,
+	config Config,
+) *Server {
+	s := New(log, sessions, events, config)
+
+	registerSessionRoutes(s)
+
+	s.server = &http.Server{
+		Addr:         config.Addr,
+		Handler:      http.HandlerFunc(s.router.ServeHTTP),
+		ReadTimeout:  5 * time.Second,
+		WriteTimeout: 5 * time.Second,
+		IdleTimeout:  120 * time.Second,
+	}
+
+	return s
+}
+
+func genULID() string {
+	t := time.Now()
+	//nolint
+	return ulid.MustNew(ulid.Timestamp(t), ulid.Monotonic(rand.New(rand.NewSource(t.UnixNano())), 0)).String()
 }
